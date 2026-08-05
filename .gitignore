@@ -84,8 +84,10 @@ testlab/robo/Screenshot*.png
 .firebase/hosting.*.cache
 .gradle/9.4.1/fileHashes/fileHashes.lock
 
-# graphify local working files
-graphify-out/
+# graphify local working files — keep only graph.json (needed to query the graph),
+# skip graph.html/GRAPH_REPORT.md/cache/manifest etc.
+graphify-out/*
+!graphify-out/graph.json
 .claude/settings.json.graphify-bak
 
 # Local ad-hoc audit output (not the tracked deploy-checker.md/env-validator.md pair)

@@ -2,3 +2,15 @@ public/images/
 public/avatars/
 public/icons/
 android/app/src/main/res/
+
+# Native/generated trees — noise for a knowledge graph of app code
+android/build/
+android/app/build/
+capacitor-cordova-android-plugins/
+gradle/
+.gradle/
+coverage/
+typescript/
+testlab/
+website/
+diagrams/

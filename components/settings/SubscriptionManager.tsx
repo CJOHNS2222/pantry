@@ -37,7 +37,7 @@ const getPlanProductId = (planId: string, period: 'monthly' | 'yearly'): Product
 };
 
 export const SubscriptionManager: React.FC<SubscriptionManagerProps> = ({ user }) => {
-  const { subscription, isPremium, isActive, updateSubscription } = useSubscription(user);
+  const { subscription, isPremium, isActive } = useSubscription(user);
   const { addToast } = useAppActions();
   const [showPlans, setShowPlans] = useState(false);
   const [usageLimits, setUsageLimits] = useState<UsageLimits | null>(null);
@@ -117,23 +117,18 @@ export const SubscriptionManager: React.FC<SubscriptionManagerProps> = ({ user }
     setPurchaseLoading(productId);
     try {
       AnalyticsService.trackSubscriptionFunnel('payment_attempt', { plan_name: plan.name });
-      const result = await purchaseProduct(productId);
+      // Plan change (not a first purchase): pass the current purchase token so Play
+      // Billing treats this as a replace instead of an independent second subscription.
+      const isPlanChange = currentTierIndex > 0 && subscription?.tier !== plan.id;
+      const oldPurchaseToken = isPlanChange ? subscription?.purchase_token : undefined;
+      const result = await purchaseProduct(productId, oldPurchaseToken);
       if (result.success) {
         AnalyticsService.trackSubscriptionFunnel('payment_success', { plan_name: plan.name });
-        
-        // Optimistic UI update: instantly update the user's Firestore subscription document
-        // so all listeners and settings page panels refresh in 0ms without waiting.
-        const tier = plan.id as 'premium' | 'family';
-        await updateSubscription({
-          tier,
-          status: 'active',
-          product_id: productId,
-          cancel_at_period_end: false,
-          current_period_end: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000) // fallback 30 days
-        }).catch((err: unknown) => {
-          log.error('Optimistic subscription update failed', { error: err instanceof Error ? err.message : String(err) }, 'SubscriptionManager');
-        });
 
+        // No client-side Firestore write here: firestore.rules' subscriptionUnchanged()
+        // correctly blocks clients from writing users/{uid}.subscription. The real update
+        // is written by verifyPurchase.ts (Admin SDK) and picked up by useSubscription.ts's
+        // onSnapshot listener.
         addToast(`Success! You have upgraded to the ${plan.name} plan.`, 'success');
       } else {
         setPurchaseError(result.error ?? 'Purchase failed. Please try again.');

@@ -1,3 +1,13 @@
+## [3.0.20] - 2026-08-05
+
+### Added / Changed / Fixed
+- **Subscription Management Security & Purchase Flows** — Reinforced security rules to prevent client-side modifications of `ownerSubscriptionTier`, routed updates exclusively through Cloud Functions, and handled in-app plan replacement updates in Google Play Billing.
+- **Google Play RTDN & Sync Automation** — Improved Pub/Sub notification handling with plan-change validation to prevent stale clobbering, capped retry windows on transient Play API failures, and automated `ownerSubscriptionTier` syncing via the Admin SDK.
+- **Gemini Search Recipe Caching Optimization** — Redesigned caching architecture to write chunked recipe arrays under `geminiRecipeCache/cache_N` docs, significantly reducing document counts and write overhead while satisfying updated Firestore security rules.
+- **Household Membership Verification** — Enforced subscription status validation in family group limit calculations, ensuring lapsed/cancelled subscriptions correctly respect free tier limits.
+
+---
+
 ## [3.0.19] - 2026-08-04
 
 ### Added / Changed / Fixed

@@ -19,6 +19,7 @@
 import { Capacitor } from '@capacitor/core';
 import { getCallableFunction } from '../firebaseConfig';
 import { log } from './logService';
+import { PRODUCT_TIER_MAP as GENERATED_PRODUCT_TIER_MAP } from '../constants/productTierMap';
 
 // Product IDs — must exactly match what is created in Google Play Console
 export const PRODUCT_IDS = {
@@ -30,13 +31,11 @@ export const PRODUCT_IDS = {
 
 export type ProductId = typeof PRODUCT_IDS[keyof typeof PRODUCT_IDS];
 
-// Maps store product ID → subscription tier written to Firestore
-export const PRODUCT_TIER_MAP: Record<ProductId, 'premium' | 'family'> = {
-  [PRODUCT_IDS.PREMIUM_MONTHLY]: 'premium',
-  [PRODUCT_IDS.PREMIUM_YEARLY]: 'premium',
-  [PRODUCT_IDS.FAMILY_MONTHLY]: 'family',
-  [PRODUCT_IDS.FAMILY_YEARLY]: 'family',
-};
+// Maps store product ID → subscription tier written to Firestore.
+// Generated from constants/productTierMap.json (single source of truth shared
+// with functions/src/googlePlayHelpers.ts — see .claude/audits/FIXES.md F63).
+export const PRODUCT_TIER_MAP: Record<ProductId, 'premium' | 'family'> =
+  GENERATED_PRODUCT_TIER_MAP as Record<ProductId, 'premium' | 'family'>;
 
 export interface PurchaseResult {
   success: boolean;
@@ -181,7 +180,7 @@ export function getProductPrice(productId: ProductId): string | null {
  * Launch the Google Play billing flow for the given product ID.
  * Resolves after the purchase is verified server-side (or fails).
  */
-export function purchaseProduct(productId: ProductId): Promise<PurchaseResult> {
+export function purchaseProduct(productId: ProductId, oldPurchaseToken?: string): Promise<PurchaseResult> {
   return new Promise((resolve) => {
     if (!Capacitor.isNativePlatform()) {
       if (import.meta.env.DEV) {
@@ -218,7 +217,16 @@ export function purchaseProduct(productId: ProductId): Promise<PurchaseResult> {
       resolve(ok ? { success: true } : { success: false, error })
     );
 
-    IAP.store.order(orderTarget).then((err: any) => {
+    // On a plan change (upgrade/downgrade/crossgrade), pass the old purchase token so
+    // Play Billing treats this as a replace (SubscriptionUpdateParams) rather than an
+    // independent second subscription — without it Play may double-charge or reject
+    // the order. cordova-plugin-purchase's Google Play Offer.order() accepts this via
+    // an additionalData.googlePlay object.
+    const orderOptions = oldPurchaseToken
+      ? {additionalData: {googlePlay: {oldPurchaseToken, replacementMode: 'IMMEDIATE_WITH_TIME_PRORATION'}}}
+      : undefined;
+
+    IAP.store.order(orderTarget, orderOptions).then((err: any) => {
       if (err) {
         _pendingResolvers.delete(productId);
         resolve({ success: false, error: err.message ?? 'Order failed' });

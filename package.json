@@ -1,13 +1,14 @@
 {
   "name": "stockandspoon",
   "private": true,
-  "version": "3.0.19",
+  "version": "3.0.20",
   "type": "module",
   "scripts": {
     "generate:changelog": "node scripts/generate-changelog.cjs",
+    "generate:product-tier-map": "node scripts/generate-product-tier-map.cjs",
     "dashboard": "node scripts/dashboard.mjs",
-    "predev": "node scripts/generate-changelog.cjs",
-    "prebuild": "node scripts/generate-changelog.cjs",
+    "predev": "node scripts/generate-changelog.cjs && node scripts/generate-product-tier-map.cjs",
+    "prebuild": "node scripts/generate-changelog.cjs && node scripts/generate-product-tier-map.cjs",
     "dev": "vite",
     "build": "vite build",
     "build:analyze": "vite build --mode analyze",

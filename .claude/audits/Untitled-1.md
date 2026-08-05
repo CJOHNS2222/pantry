@@ -17,16 +17,16 @@
 
   🟡 P1 — Highlights (22)
 
-  - 4 new modals aren't accessible dialogs — no role="dialog", no focus trap, no Escape. PantrySearchModal is worst: no close path at all. **Fixed (prior work)**: all 4 now use shared `<Modal>` component with focus trap, Escape, useModalOpen, useAndroidBack.    
+    
   - MealPlanner index bug — drag-drop/leftover-swap uses display indices against the rotated mealPlan array → mutates the wrong day when the  
-  plan doesn't start today. **Still open**: subtle index-space bug; handlers use display indices directly on mealPlan without `displayToOriginal[dayIndex]` conversion. Fix needs manual QA — test harness broken (React 19.2.7 `act` export issue).
-  - 2 crashes — unguarded JSON.parse in useSettings (white screen), missingIngredients throws on recipes without an ingredients array. **Fixed (2026-08-04)**: try/catch around JSON.parse in useState initializer; `(x ?? [])` guards on recipe.ingredients.map in MealPlanner and RecipeFinder. Committed as 3f4c080.        
+  plan doesn't start today.
+  - 2 crashes — unguarded JSON.parse in useSettings (white screen), missingIngredients throws on recipes without an ingredients array.        
   - 2 missing Firestore composite indexes for recipeRatings; getSavedRecipes reads the whole catalog with no limit.
   - Scan-hook tangle — usePantryScan + usePantryScannerScan duplicated (95 lines dead code), any[] types, a13-arg hook.
   - Capacitor8 vs Google-Auth plugin pinned to Capacitor6 (release candidate, shipped) — Google Sign-In risk.
   - CI/functions on Node20, but @capacitor/cli, lint-staged, @zxing need ≥22/24.
   - 7 moderate vulns in functions (uuid chain) — fixable with an overrides entry.
-  - Contrast fail: white-on-amber-500 ≈2.1:1, global Button + new modals. Zoom disabled via viewport meta. **Fixed (2026-08-04)**: F3 viewport already clean; F4 swept ~65 files using `--accent-text` token (≈7.5:1). Committed as fb92b48.
+  - Contrast fail: white-on-amber-500 ≈2.1:1, global Button + new modals. Zoom disabled via viewport meta.
 
   🟢 P2/P3 — Notable~12 touch targets under44px, unlabeled form controls in ScanReviewModal, zero tests on3 new modals, twin notification     
   services colliding, AppContext monolithic (every consumer re-renders on any change),1.7 MB eager JS (React not split out), PWA precaches    
@@ -74,12 +74,12 @@ UI/UX Audit — Stock & Spoon (delta on current changeset)
   Remediation: Add useAndroidBack(isOpen, onClose), include isSearchModalOpen in useModalOpen(...) at PantryScanner.tsx:288, and add a focus/Escape handler (or migrate to    
   Modal).
 
-  **Completed***F3 (P1) — Zoom disabled via viewport metaC:\Users\cjohn\pantry\index.html:5 — maximum-scale=1.0, user-scalable=no blocks pinch-zoom and browser font-scaling (WCAG1.4.4     
+  F3 (P1) — Zoom disabled via viewport metaC:\Users\cjohn\pantry\index.html:5 — maximum-scale=1.0, user-scalable=no blocks pinch-zoom and browser font-scaling (WCAG1.4.4     
   Resize Text,1.4.10 Reflow, and Apple's requirement to allow200% zoom).
 
   Remediation: Remove user-scalable=no and maximum-scale=1.0; keep viewport-fit=cover. If the Android webview needs it, scope it there instead of in the shared HTML.
 
-  **Completed***F4 (P1) — White text on amber accent fails contrast in light themeindex.html:51 sets --accent-color: #F59E0B (amber-500) for light theme. bg-[var(--accent-color)]
+  F4 (P1) — White text on amber accent fails contrast in light themeindex.html:51 sets --accent-color: #F59E0B (amber-500) for light theme. bg-[var(--accent-color)]
   text-white computes to ~2.1:1 — far below the4.5:1 AA requirement for the small, bold labels used on these CTAs.
 
   - C:\Users\cjohn\pantry\components\ui\Button.tsx:57 (primary variant — global)
@@ -92,8 +92,6 @@ UI/UX Audit — Stock & Spoon (delta on current changeset)
   (Dark theme uses rose-700 #BE123C with white ≈6.4:1 — passes.)
 
   Remediation: In light theme switch the accent to amber-700 (#B45309, ≈6.4:1 with white) or use dark text on amber-500.   Ask user before changing colors. 
-
-  Resolved (2026-08-03): Used the existing `--accent-text` token (dark text `#1F2937` on amber light theme / white on rose-700 dark theme, ≈7.5:1). Swept ~135 hardcoded `text-white` → `text-[var(--accent-text,white)]` across ~58 files wherever `bg-[var(--accent-color)]` is used. tsc + eslint pass; vitest failure is pre-existing React 19.2.7 `act` export issue, unrelated to this change.
 
   F5 (P2) — Touch targets under44pxWCAG2.5.5 / Apple HIG. Measured from the class strings:
 

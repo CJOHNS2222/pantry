@@ -86,6 +86,13 @@ describe('firestore.rules — household scoping', () => {
       outsiderCtx.firestore().doc(`households/${householdAId}/cache/inventory`).set({ items: ['hacked'] })
     );
   });
+
+  it('denies a member self-granting ownerSubscriptionTier via a client update', async () => {
+    const memberCtx = testEnv.authenticatedContext(memberA);
+    await assertFails(
+      memberCtx.firestore().doc(`households/${householdAId}`).update({ ownerSubscriptionTier: 'family' })
+    );
+  });
 });
 
 describe('firestore.rules — per-user document scoping', () => {

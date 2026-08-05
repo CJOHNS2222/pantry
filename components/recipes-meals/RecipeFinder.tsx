@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { ChevronDown, ChevronUp, Sparkles } from 'lucide-react';
 import { searchRecipes } from '../../services/geminiService';
 import { setUserGeminiOptIn } from '../../services/featureFlags';
-import { getCachedRecipesCache, submitRecipeForReview, cacheGeminiSearchRecipe } from '../../services/recipeService';
+import { getCachedRecipesCache, submitRecipeForReview, cacheGeminiSearchRecipes } from '../../services/recipeService';
 import { RecipeSearchResult, LoadingState, RecipeRating, StructuredRecipe, PantryItem, SavedRecipe, User, Household, RecipeSearchParams, RecipeSuggestion } from '../../types';
 import { PremiumFeature } from '../settings/PremiumFeature';
 import { log } from '../../services/logService';
@@ -705,13 +705,9 @@ const RecipeFinderComponent: React.FC<RecipeFinderProps> = ({ onAddToPlan, onSav
                 } as RecipeSearchParams, user);
                 wasFromCache = false;
                 if (data.recipes && data.recipes.length > 0 && user?.id) {
-                    Promise.all(
-                        data.recipes.map(recipe =>
-                            cacheGeminiSearchRecipe(recipe, user.id, params.query).catch((err: unknown) =>
-                                log.error('Failed to auto-cache search recipe', { err, recipe: recipe.title }, 'RecipeFinder')
-                            )
-                        )
-                    ).catch((err: unknown) => log.error('Failed to run auto-cache batch', { err }, 'RecipeFinder'));
+                    cacheGeminiSearchRecipes(data.recipes, user.id, params.query).catch((err: unknown) =>
+                        log.error('Failed to auto-cache search recipes', { err }, 'RecipeFinder')
+                    );
                 }
             }
             // Filter results by type (quick meal, dinner, dessert)

@@ -554,50 +554,76 @@ export const saveRecipeToFirestore = async (
   }, { operation: 'saveRecipeToFirestore', recipeTitle: recipe.title }, { retries: 1 });
 };
 
+const GEMINI_CACHE_BASE = 'geminiRecipeCache/cache';
+const GEMINI_CACHE_CHUNK_SIZE = 300;
+
 /**
- * Auto-cache a raw Gemini search result into its own collection (separate from
- * `recipes`, which is user-saved/community content). Unmoderated, kept for later
- * curation into recipe_caches — not read back into search results yet.
- * Dedups by title so repeated searches don't pile up duplicate docs.
+ * Auto-cache a batch of raw Gemini search results (one search response) into
+ * `geminiRecipeCache/cache_N` chunk docs (array-of-recipes per doc, same shape as
+ * `recipe_caches/*`), instead of one doc per recipe. Walks chunks once, appends all
+ * new (deduped-by-title) recipes from the batch, and writes only the chunk(s) that
+ * changed — usually 1, or 2 if the batch spills past a chunk's 300-recipe cap.
  */
-export const cacheGeminiSearchRecipe = async (
-  recipe: StructuredRecipe,
+export const cacheGeminiSearchRecipes = async (
+  recipes: StructuredRecipe[],
   userId: string,
   query?: string
-): Promise<string | null> => {
+): Promise<number> => {
+  if (recipes.length === 0) {
+    return 0;
+  }
   try {
-    const existing = await DatabaseMonitoringService.getDocs(
-      DatabaseMonitoringService.query(
-        DatabaseMonitoringService.collection('geminiRecipeCache'),
-        DatabaseMonitoringService.where('title', '==', recipe.title),
-        DatabaseMonitoringService.limit(1)
-      )
-    );
-    if (!existing.empty) {
-      return null;
+    const seenTitles = new Set<string>();
+    const pending = recipes.filter((r) => {
+      if (seenTitles.has(r.title)) return false;
+      seenTitles.add(r.title);
+      return true;
+    });
+
+    let chunkNum = 1;
+    let cached = 0;
+    while (pending.length > 0 && chunkNum <= 20) {
+      const ref = DatabaseMonitoringService.doc(`${GEMINI_CACHE_BASE}_${chunkNum}`);
+      const snap = await DatabaseMonitoringService.getDoc(ref);
+      const exists = snap && (typeof snap.exists === 'function' ? snap.exists() : snap.exists);
+      const existingRecipes: any[] = exists && Array.isArray(snap.data()?.recipes) ? snap.data()!.recipes : [];
+      const existingTitles = new Set(existingRecipes.map((r) => r.title));
+
+      const room = GEMINI_CACHE_CHUNK_SIZE - existingRecipes.length;
+      const toAdd = pending
+        .filter((r) => !existingTitles.has(r.title))
+        .slice(0, Math.max(room, 0))
+        .map((recipe) => ({
+          title: recipe.title,
+          description: recipe.description || '',
+          ingredients: recipe.ingredients || [],
+          instructions: recipe.instructions || [],
+          cookTime: recipe.cookTime || '',
+          type: recipe.type || '',
+          image: recipe.image || '',
+          userId,
+          query: query || '',
+          dateCached: new Date().toISOString(),
+        }));
+
+      if (toAdd.length > 0) {
+        await DatabaseMonitoringService.setDoc(ref, { recipes: [...existingRecipes, ...toAdd] }, { merge: true });
+        cached += toAdd.length;
+      }
+
+      const addedTitles = new Set(toAdd.map((r) => r.title));
+      for (let i = pending.length - 1; i >= 0; i--) {
+        if (addedTitles.has(pending[i].title) || existingTitles.has(pending[i].title)) {
+          pending.splice(i, 1);
+        }
+      }
+      chunkNum++;
     }
 
-    const cachedRecipe = {
-      title: recipe.title,
-      description: recipe.description || '',
-      ingredients: recipe.ingredients || [],
-      instructions: recipe.instructions || [],
-      cookTime: recipe.cookTime || '',
-      type: recipe.type || '',
-      image: recipe.image || '',
-      userId,
-      query: query || '',
-      dateCached: new Date().toISOString(),
-    };
-
-    const docRef = await DatabaseMonitoringService.addDoc(
-      DatabaseMonitoringService.collection('geminiRecipeCache'),
-      cachedRecipe
-    );
-    return docRef.id;
+    return cached;
   } catch (err: unknown) {
-    log.error('Failed to cache Gemini search recipe', { error: err, title: recipe.title }, 'RecipeService');
-    return null;
+    log.error('Failed to cache Gemini search recipes', { error: err, count: recipes.length }, 'RecipeService');
+    return 0;
   }
 };
 

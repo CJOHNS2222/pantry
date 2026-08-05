@@ -4,15 +4,12 @@
  */
 
 import {google} from 'googleapis';
+import type {Firestore} from 'firebase-admin/firestore';
+import {PRODUCT_TIER_MAP} from './generated/productTierMap';
 
 export const PACKAGE_NAME = 'com.smart.pantry';
 
-export const PRODUCT_TIER_MAP: Record<string, 'premium' | 'family'> = {
-  premium_monthly: 'premium',
-  premium_yearly: 'premium',
-  family_monthly: 'family',
-  family_yearly: 'family',
-};
+export {PRODUCT_TIER_MAP};
 
 export async function getAndroidPublisher() {
   const auth = new google.auth.GoogleAuth({
@@ -59,4 +56,32 @@ export async function resolveSubscriptionState(
         'active';
 
   return {expiryMs, status};
+}
+
+/**
+ * Pushes a verified subscription tier onto households/{id}.ownerSubscriptionTier —
+ * the field household members' premium/family access is derived from
+ * (hooks/useSubscription.ts, services/usageService.ts). firestore.rules locks this
+ * field to Admin-SDK-only writes (mirrors users/{uid}.subscription), so this is the
+ * only legitimate place it gets set. No-op if the uid isn't a household owner, or
+ * the tier is already in sync.
+ */
+export async function syncOwnerSubscriptionTier(
+  db: Firestore,
+  uid: string,
+  tier: string
+): Promise<void> {
+  const userSnap = await db.collection('users').doc(uid).get();
+  const householdId = userSnap.data()?.householdId;
+  if (!householdId) return;
+
+  const householdRef = db.collection('households').doc(householdId);
+  const householdSnap = await householdRef.get();
+  if (!householdSnap.exists) return;
+
+  const household = householdSnap.data();
+  if (household?.ownerId !== uid) return; // only the owner's tier is authoritative
+  if (household.ownerSubscriptionTier === tier) return;
+
+  await householdRef.update({ownerSubscriptionTier: tier});
 }

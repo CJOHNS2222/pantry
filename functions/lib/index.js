@@ -1,6 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.wrapImpactTrackingUrl = exports.sendDailyReminders = exports.sendPushNotificationOnWrite = exports.retryPendingAccountDeletions = exports.deleteAccount = exports.handlePlaySubscriptionNotification = exports.verifyPurchase = exports.resetWeeklyUsageLimits = exports.getNutritionData = exports.migrateHouseholdClaims = exports.acceptInvitation = exports.checkInvitation = exports.removeHouseholdMember = exports.leaveHousehold = exports.inviteMember = void 0;
+exports.wrapImpactTrackingUrl = exports.sendDailyReminders = exports.sendPushNotificationOnWrite = exports.retryPendingAccountDeletions = exports.deleteAccount = exports.handlePlaySubscriptionNotification = exports.verifyPurchase = exports.checkExpiredSubscriptions = exports.resetWeeklyUsageLimits = exports.getNutritionData = exports.migrateHouseholdClaims = exports.acceptInvitation = exports.checkInvitation = exports.removeHouseholdMember = exports.leaveHousehold = exports.inviteMember = void 0;
 const v2_1 = require("firebase-functions/v2");
 (0, v2_1.setGlobalOptions)({ region: "us-east1" });
 var inviteMember_1 = require("./inviteMember");
@@ -19,6 +19,8 @@ var nutrition_1 = require("./nutrition");
 Object.defineProperty(exports, "getNutritionData", { enumerable: true, get: function () { return nutrition_1.getNutritionData; } });
 var resetUsageLimits_1 = require("./resetUsageLimits");
 Object.defineProperty(exports, "resetWeeklyUsageLimits", { enumerable: true, get: function () { return resetUsageLimits_1.resetWeeklyUsageLimits; } });
+var checkExpiredSubscriptions_1 = require("./checkExpiredSubscriptions");
+Object.defineProperty(exports, "checkExpiredSubscriptions", { enumerable: true, get: function () { return checkExpiredSubscriptions_1.checkExpiredSubscriptions; } });
 var verifyPurchase_1 = require("./verifyPurchase");
 Object.defineProperty(exports, "verifyPurchase", { enumerable: true, get: function () { return verifyPurchase_1.verifyPurchase; } });
 var subscriptionNotifications_1 = require("./subscriptionNotifications");

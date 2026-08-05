@@ -20,7 +20,7 @@ import {onCall, HttpsError} from "firebase-functions/v2/https";
 import {logger} from "firebase-functions/v2";
 import {getApps, initializeApp} from "firebase-admin/app";
 import {getFirestore, Timestamp} from "firebase-admin/firestore";
-import {PRODUCT_TIER_MAP, resolveSubscriptionState} from "./googlePlayHelpers";
+import {PRODUCT_TIER_MAP, resolveSubscriptionState, syncOwnerSubscriptionTier} from "./googlePlayHelpers";
 
 if (!getApps().length) {
   initializeApp();
@@ -184,6 +184,12 @@ export const verifyPurchase = onCall({ enforceAppCheck: false }, async (request)
   // line is never reached and the client's `.unverified()` handler fires
   // instead, so the purchase is never acknowledged.
   logger.info('Subscription granted', { uid, tier, status });
+
+  // Non-fatal: household-tier sync failing shouldn't fail an already-committed,
+  // already-acknowledged purchase.
+  await syncOwnerSubscriptionTier(db, uid, tier).catch((err: any) =>
+    logger.error('Failed to sync ownerSubscriptionTier', { uid, message: err.message })
+  );
 
   return {ok: true, tier, status, expiryMs};
 });

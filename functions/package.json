@@ -2,7 +2,8 @@
   "name": "functions",
   "scripts": {
     "lint": "eslint .",
-    "build": "tsc",
+    "prebuild": "node ../scripts/generate-product-tier-map.cjs",
+    "build": "npm run prebuild && tsc",
     "build:watch": "tsc --watch",
     "serve": "npm run build && firebase emulators:start --only functions",
     "shell": "npm run build && firebase functions:shell",

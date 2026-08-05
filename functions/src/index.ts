@@ -10,6 +10,7 @@ export {acceptInvitation} from './acceptInvitation';
 export {migrateHouseholdClaims} from './migrateHouseholdClaims';
 export {getNutritionData} from './nutrition';
 export {resetWeeklyUsageLimits} from './resetUsageLimits';
+export {checkExpiredSubscriptions} from './checkExpiredSubscriptions';
 export {verifyPurchase} from './verifyPurchase';
 export {handlePlaySubscriptionNotification} from './subscriptionNotifications';
 export {deleteAccount, retryPendingAccountDeletions} from './deleteAccount';

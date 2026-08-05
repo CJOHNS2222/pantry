@@ -20,6 +20,16 @@ export interface DetailedChangeEntry {
 
 export const RECENT_CHANGES: ChangeEntry[] = [
   {
+    "version": "3.0.20",
+    "date": "Aug 5, 2026",
+    "highlights": [
+      "Subscription Management Security & Purchase Flows — Reinforced security rules to prevent client-side modifications of…",
+      "Google Play RTDN & Sync Automation — Improved Pub/Sub notification handling with plan-change validation to prevent…",
+      "Gemini Search Recipe Caching Optimization — Redesigned caching architecture to write chunked recipe arrays under…",
+      "Household Membership Verification — Enforced subscription status validation in family group limit calculations,…"
+    ]
+  },
+  {
     "version": "3.0.19",
     "date": "Aug 4, 2026",
     "highlights": [
@@ -38,17 +48,25 @@ export const RECENT_CHANGES: ChangeEntry[] = [
       "Hands-Free Cooking Mode Voice Commands — Added voice recognition & text-to-speech step reader to Cooking Mode (\"Next\",…",
       "Mobile Touch Pull-To-Refresh & Nav Badges — Added pull-to-refresh touch gesture wrapper and dynamic navigation badge…"
     ]
-  },
-  {
-    "version": "3.0.17",
-    "date": "Aug 3, 2026",
-    "highlights": [
-      "Accessibility Improvements (F3-F18) — Remediated 16 accessibility findings: enabled viewport pinch-zoom, implemented…"
-    ]
   }
 ];
 
 export const ALL_CHANGES: DetailedChangeEntry[] = [
+  {
+    "version": "3.0.20",
+    "date": "Aug 5, 2026",
+    "sections": [
+      {
+        "title": "Added / Changed / Fixed",
+        "bullets": [
+          "**Subscription Management Security & Purchase Flows** — Reinforced security rules to prevent client-side modifications of `ownerSubscriptionTier`, routed updates exclusively through Cloud Functions, and handled in-app plan replacement updates in Google Play Billing.",
+          "**Google Play RTDN & Sync Automation** — Improved Pub/Sub notification handling with plan-change validation to prevent stale clobbering, capped retry windows on transient Play API failures, and automated `ownerSubscriptionTier` syncing via the Admin SDK.",
+          "**Gemini Search Recipe Caching Optimization** — Redesigned caching architecture to write chunked recipe arrays under `geminiRecipeCache/cache_N` docs, significantly reducing document counts and write overhead while satisfying updated Firestore security rules.",
+          "**Household Membership Verification** — Enforced subscription status validation in family group limit calculations, ensuring lapsed/cancelled subscriptions correctly respect free tier limits."
+        ]
+      }
+    ]
+  },
   {
     "version": "3.0.19",
     "date": "Aug 4, 2026",

@@ -405,8 +405,14 @@ class UsageService {
     // For free users: max 2 members (themselves + 1 family member)
     // For premium: max 3 members
     // For family: max 5 members (user + 4 family members)
-    const maxMembers = user.subscription?.tier === 'family' ? 5 :
-                      user.subscription?.tier === 'premium' ? 3 : 2;
+    // Same active-status clamp as getUsageLimits — a lapsed/cancelled subscription
+    // whose `tier` field hasn't been downgraded yet (RTDN CANCELED/ON_HOLD lag) no
+    // longer earns the paid-tier member limit.
+    const subStatus = user.subscription?.status;
+    const isSubActive = subStatus === 'active' || subStatus === 'trialing';
+    const effectiveTier = isSubActive ? user.subscription?.tier : undefined;
+    const maxMembers = effectiveTier === 'family' ? 5 :
+                      effectiveTier === 'premium' ? 3 : 2;
 
     const canAdd = currentMemberCount < maxMembers;
     log.debug('canAddHouseholdMember - Result', {

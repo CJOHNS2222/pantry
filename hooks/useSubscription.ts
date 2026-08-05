@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
+import React, { createContext, useContext, useState, useEffect } from 'react';
 import DatabaseMonitoringService from '../services/databaseMonitoringService';
 import { User, Subscription } from '../types';
 import { UsageService } from '../services/usageService';
@@ -21,8 +21,6 @@ function useSubscriptionInternal(user: User | null, enabled: boolean) {
   const [loading, setLoading] = useState(true);
   // Tier inherited from the household owner (non-null only when member is in a family household)
   const [householdOwnerTier, setHouseholdOwnerTier] = useState<'free' | 'premium' | 'family' | null>(null);
-  // Track the last synced owner tier to avoid redundant Firestore writes
-  const lastSyncedOwnerTier = useRef<string | null>(null);
 
   // ── Own subscription listener ──────────────────────────────────────────────
   useEffect(() => {
@@ -72,9 +70,10 @@ function useSubscriptionInternal(user: User | null, enabled: boolean) {
   }, [user?.id, enabled]);
 
   // ── Household subscription listener ───────────────────────────────────────
-  // Two responsibilities:
-  //   1. If user is a non-admin member in a household whose owner has 'family', elevate.
-  //   2. If user is the household admin, keep ownerSubscriptionTier in sync with their tier.
+  // If user is a non-admin member in a household whose owner has 'family'/'premium',
+  // elevate. ownerSubscriptionTier itself is server-written only (Cloud Functions,
+  // see functions/src/googlePlayHelpers.ts syncOwnerSubscriptionTier) — firestore.rules
+  // rejects a client write to it, so this listener no longer writes it.
   useEffect(() => {
     const householdId = user?.householdId;
     if (!enabled || !householdId || !user?.id || !subscription) {
@@ -96,17 +95,6 @@ function useSubscriptionInternal(user: User | null, enabled: boolean) {
         const isAdmin = currentMember?.role === 'admin';
 
         if (isAdmin) {
-          // Owner: keep ownerSubscriptionTier on the household doc in sync with own tier
-          const ownTier = subscription.tier ?? 'free';
-          if (ownTier !== lastSyncedOwnerTier.current) {
-            lastSyncedOwnerTier.current = ownTier;
-            DatabaseMonitoringService.updateDoc(
-              DatabaseMonitoringService.doc('households', householdId),
-              { ownerSubscriptionTier: ownTier }
-            ).catch((err: any) =>
-              log.error('Failed to sync ownerSubscriptionTier', { error: err?.message }, 'useSubscription')
-            );
-          }
           // Admin always uses their own subscription — no elevation needed
           setHouseholdOwnerTier(null);
         } else {

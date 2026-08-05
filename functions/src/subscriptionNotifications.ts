@@ -25,7 +25,7 @@ import {onMessagePublished} from 'firebase-functions/v2/pubsub';
 import {logger} from 'firebase-functions/v2';
 import {getApps, initializeApp} from 'firebase-admin/app';
 import {getFirestore, Timestamp} from 'firebase-admin/firestore';
-import {PACKAGE_NAME, PRODUCT_TIER_MAP, resolveSubscriptionState} from './googlePlayHelpers';
+import {PACKAGE_NAME, PRODUCT_TIER_MAP, resolveSubscriptionState, syncOwnerSubscriptionTier} from './googlePlayHelpers';
 
 if (!getApps().length) {
   initializeApp();
@@ -72,6 +72,9 @@ const ACTIONABLE_TYPES = new Set([
   NotificationType.SUBSCRIPTION_EXPIRED,
 ]);
 
+// Stop retrying a failed re-verify after this long — see catch block below.
+const MAX_RETRY_AGE_MS = 24 * 60 * 60 * 1000;
+
 interface PlayRtdnPayload {
   packageName?: string;
   eventTimeMillis?: string;
@@ -85,7 +88,7 @@ interface PlayRtdnPayload {
 
 export const handlePlaySubscriptionNotification = onMessagePublished(
   // Explicit region to match every other function in this project (us-east1).
-  {topic: 'play-store-notifications', region: 'us-east1'},
+  {topic: 'play-store-notifications', region: 'us-east1', retry: true},
   async (event) => {
     let payload: PlayRtdnPayload;
     try {
@@ -128,7 +131,8 @@ export const handlePlaySubscriptionNotification = onMessagePublished(
 
     const db = getFirestore();
 
-    const tokenDoc = await db.collection('purchaseTokens').doc(purchaseToken).get();
+    const tokenRef = db.collection('purchaseTokens').doc(purchaseToken);
+    const tokenDoc = await tokenRef.get();
     if (!tokenDoc.exists) {
       logger.warn('No uid mapping for purchaseToken — was verifyPurchase ever called for it?', {
         purchaseToken,
@@ -136,11 +140,42 @@ export const handlePlaySubscriptionNotification = onMessagePublished(
       });
       return;
     }
-    const {uid} = tokenDoc.data() as {uid: string};
+    const tokenData = tokenDoc.data() as {uid: string; superseded?: boolean};
+    const {uid} = tokenData;
+    if (tokenData.superseded) {
+      // A plan-change already superseded this token (see the guard below) — any
+      // further redelivery for it (Pub/Sub retry, late terminal EXPIRED/REVOKED
+      // months later) is a stale no-op.
+      logger.info('Ignoring Play RTDN for already-superseded purchaseToken', {
+        uid,
+        purchaseToken,
+        notificationType,
+      });
+      return;
+    }
 
     const userRef = db.collection('users').doc(uid);
     const userSnap = await userRef.get();
     const currentSub = userSnap.data()?.subscription;
+
+    // Plan-change guard: on an upgrade/downgrade/crossgrade Play issues a NEW
+    // purchaseToken and fires RTDN events for both the old and new token with no
+    // ordering guarantee. If the user's on-file token has already moved on to a
+    // different (newer) token, this notification is about a now-superseded
+    // predecessor purchase — never let it clobber the current state with a stale
+    // cancelled/expired write (last-write-wins would silently downgrade an
+    // actively-paying user). Mark the stale token superseded so future
+    // redeliveries also no-op via the check above.
+    if (currentSub?.purchase_token && currentSub.purchase_token !== purchaseToken) {
+      await tokenRef.set({superseded: true}, {merge: true});
+      logger.info('Ignoring Play RTDN — purchaseToken superseded by a newer purchase on file', {
+        uid,
+        purchaseToken,
+        currentToken: currentSub.purchase_token,
+        notificationType,
+      });
+      return;
+    }
     // Derive tier from the product catalog rather than defaulting to 'premium' —
     // an unrecognized subscriptionId (typo'd product id, new product not yet added
     // to PRODUCT_TIER_MAP, etc.) must never silently grant premium access. Fall
@@ -172,6 +207,9 @@ export const handlePlaySubscriptionNotification = onMessagePublished(
         notificationType,
         purchaseToken,
       });
+      await syncOwnerSubscriptionTier(db, uid, 'free').catch((err: any) =>
+        logger.error('Failed to sync ownerSubscriptionTier', {uid, message: err.message})
+      );
       return;
     }
 
@@ -197,12 +235,38 @@ export const handlePlaySubscriptionNotification = onMessagePublished(
         status,
         expiryMs,
       });
+      await syncOwnerSubscriptionTier(db, uid, tier).catch((err: any) =>
+        logger.error('Failed to sync ownerSubscriptionTier', {uid, message: err.message})
+      );
     } catch (err: any) {
+      const ageMs = Date.now() - Number(payload.eventTimeMillis ?? 0);
+      // Cap redelivery window ourselves — retry:true otherwise lets Pub/Sub hammer
+      // the Play API for up to 7 days on a persistent failure (billed per attempt).
+      // Past MAX_RETRY_AGE_MS this is almost certainly not going to self-resolve;
+      // stop retrying and leave a loud log for manual follow-up (verify/refund by
+      // hand) instead of burning a week of retries.
+      if (ageMs > MAX_RETRY_AGE_MS) {
+        logger.error('Giving up on Play RTDN re-verify after max retry age — needs manual follow-up', {
+          uid,
+          notificationType,
+          purchaseToken,
+          ageMs,
+          message: err.message,
+        });
+        return;
+      }
       logger.error('Failed to re-verify subscription after RTDN', {
         uid,
         notificationType,
         message: err.message,
       });
+      // Rethrow so Pub/Sub redelivers (retry: true above) — this is almost always a
+      // transient Play Developer API failure (rate limit, expired auth token, 5xx).
+      // A malformed/unrecoverable payload never reaches this catch: notificationType,
+      // purchaseToken, and subscriptionId are all validated earlier, and
+      // resolveSubscriptionState's own not-found cases are handled internally rather
+      // than thrown here — so anything landing in this catch is worth retrying.
+      throw err;
     }
   }
 );
