@@ -13,6 +13,7 @@ export {resetWeeklyUsageLimits} from './resetUsageLimits';
 export {checkExpiredSubscriptions} from './checkExpiredSubscriptions';
 export {verifyPurchase} from './verifyPurchase';
 export {handlePlaySubscriptionNotification} from './subscriptionNotifications';
+export {repairSubscriptions} from './repairSubscriptions';
 export {deleteAccount, retryPendingAccountDeletions} from './deleteAccount';
 export {sendPushNotificationOnWrite} from './sendPushNotification';
 export {sendDailyReminders} from './dailyReminders';

@@ -161,7 +161,7 @@ If two rules conflict, prioritize:
 - **Platform guards**: Use `Capacitor.getPlatform()` for mobile-specific behavior.
 - **API limits**: Spoonacular has rate limits; cache via dedicated services.
 - **Error handling**: Use `AppError` class with codes/context. Route through `ErrorBoundary.tsx` → Sentry + Crashlytics.
-- **npm install for `@capacitor-firebase/*`**: Always use `--legacy-peer-deps` due to peer dependency conflict with `@codetrix-studio/capacitor-google-auth`.
+- **npm install**: Runs plain — no `--legacy-peer-deps`. The `@codetrix-studio/capacitor-google-auth` peer conflict (peers `@capacitor/core@^6`, project is on 8) is handled by a scoped `overrides` block in `package.json`.
 
 ## 15) Key Exemplar Files
 - `firebaseConfig.ts`: Firebase initialization, platform handling, monitoring setup

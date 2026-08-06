@@ -67,8 +67,8 @@ class PushNotificationService {
     throw new Error('requestPermissions failed after retries');
   }
 
-  async initialize(userId?: string): Promise<void> {
-    if (this.isInitialized || !Capacitor.isNativePlatform()) {
+  async initialize(userId?: string, forceReregister = false): Promise<void> {
+    if ((this.isInitialized && !forceReregister) || !Capacitor.isNativePlatform()) {
       return;
     }
 
@@ -140,7 +140,8 @@ class PushNotificationService {
       if (this.userId) {
         const userRef = DatabaseMonitoringService.doc('users', this.userId);
         await DatabaseMonitoringService.updateDoc(userRef, {
-          fcmTokens: arrayUnion(token)
+          fcmTokens: arrayUnion(token),
+          needsFcmTokenRefresh: false
         });
       }
     } catch (err: unknown) {

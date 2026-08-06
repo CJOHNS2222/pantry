@@ -30,8 +30,8 @@ android {
         // in sync with libs.versions.toml's `compileSdk` by hand.
         minSdk rootProject.ext.minSdkVersion
         targetSdk rootProject.ext.targetSdkVersion
-        versionCode 113
-        versionName "3.0.20"
+        versionCode 114
+        versionName "3.0.21"
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         
         buildFeatures {

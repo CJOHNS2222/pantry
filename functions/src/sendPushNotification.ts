@@ -69,7 +69,8 @@ export const sendPushNotificationOnWrite = onDocumentWritten(
     const fcmTokens: string[] = Array.isArray(userData?.fcmTokens) ? (userData?.fcmTokens as string[]) : [];
 
     if (fcmTokens.length === 0) {
-      logger.info(`[sendPushNotification] No FCM tokens for user ${userId} � cannot send push.`);
+      await db.collection('users').doc(userId).update({ needsFcmTokenRefresh: true }).catch(() => {});
+      logger.info(`[sendPushNotification] No FCM tokens for user ${userId}� cannot send push.`);
       return;
     }
 

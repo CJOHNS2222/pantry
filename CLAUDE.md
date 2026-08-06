@@ -10,7 +10,7 @@ Guidance for Claude Code (claude.ai/code) here.
 ## Commands
 
 ```
-npm install                  # use --legacy-peer-deps if @capacitor-firebase/* conflicts with capacitor-google-auth
+npm install                  # plain install; no --legacy-peer-deps needed (see Environment essentials)
 npm run dev                  # vite dev server, port 3000
 npm run build                # production build (predev/prebuild regenerate constants/changelogEntries.ts from CHANGELOG.md)
 npm run build:analyze        # build + rollup-plugin-visualizer treemap at dist/stats.html
@@ -48,9 +48,16 @@ All Firestore reads/writes for pantry, shopping, meal plan, recipes must go thro
 
 ## Environment essentials
 - Env vars use `VITE_` prefix; actual Firebase SDK config in `VITE_firebaseConfig.ts`, not generic `.env`.
-- `npm install` needs `--legacy-peer-deps` for `@capacitor-firebase/*` due to peer conflict with `@codetrix-studio/capacitor-google-auth`.
+- `npm install` runs plain — **no `--legacy-peer-deps`**. `@codetrix-studio/capacitor-google-auth` is an abandoned RC that peers on `@capacitor/core@^6` while the project is on 8; a scoped `overrides` block in `package.json` pins it to the hoisted `@capacitor/core`. Keep that block if you touch Capacitor versions. (`functions/` still has its own `.npmrc` with `legacy-peer-deps=true` for an unrelated `firebase-functions-test`/`firebase-admin@14` conflict.)
 - `@/*` path alias -> project root (`tsconfig.json` + `vite.config.ts`).
 - Tests: Vitest + jsdom under `src/test/**/*.test.{ts,tsx}`, globals mocked in `src/test/setup.ts`. `vi.mock()` over MSW. (Rest of pitfalls, mock list, directory map: vault.)
+
+## Environment
+- Host is Windows. PowerShell primary shell, Bash tool also available — each needs its own syntax, don't mix.
+- No `jq` on this host — parse/build JSON with `node -e` or PowerShell `ConvertFrom-Json`/`ConvertTo-Json`, not `jq`.
+- `python3` is shadowed by a Windows Store alias stub — use `python`, not `python3`.
+- Avoid bash heredocs for file content — use the Write tool instead.
+- Never run slash commands (`/verify`, `/graphify`, etc.) as shell commands — they're Claude Code commands, not executables on PATH.
 
 ## graphify
 Project has knowledge graph at graphify-out/ with god nodes, community structure, cross-file relationships.

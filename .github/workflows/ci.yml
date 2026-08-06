@@ -76,10 +76,8 @@ jobs:
           node-version: ${{ env.NODE_VERSION }}
           cache: npm
 
-      # @capacitor-firebase/* has a peer-dep conflict with
-      # @codetrix-studio/capacitor-google-auth — see CLAUDE.md.
       - name: Install dependencies
-        run: npm ci --legacy-peer-deps
+        run: npm ci
 
       - name: Lint
         run: npm run lint
@@ -142,7 +140,7 @@ jobs:
           java-version: '17'
 
       - name: Install dependencies
-        run: npm ci --legacy-peer-deps
+        run: npm ci
 
       - name: Install firebase-tools
         # Pinned so emulator/rules-test behavior can't shift under an unrelated PR.

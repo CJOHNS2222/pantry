@@ -25,7 +25,7 @@ import {onMessagePublished} from 'firebase-functions/v2/pubsub';
 import {logger} from 'firebase-functions/v2';
 import {getApps, initializeApp} from 'firebase-admin/app';
 import {getFirestore, Timestamp} from 'firebase-admin/firestore';
-import {PACKAGE_NAME, PRODUCT_TIER_MAP, resolveSubscriptionState, syncOwnerSubscriptionTier} from './googlePlayHelpers';
+import {PACKAGE_NAME, PRODUCT_TIER_MAP, repairSubscriptionDoc, resolveSubscriptionState, syncOwnerSubscriptionTier} from './googlePlayHelpers';
 
 if (!getApps().length) {
   initializeApp();
@@ -84,6 +84,40 @@ interface PlayRtdnPayload {
     purchaseToken: string;
     subscriptionId: string;
   };
+  voidedPurchaseNotification?: {
+    purchaseToken: string;
+    orderId: string;
+    productType: number;
+    refundType: number;
+  };
+}
+
+// productType 2 = subscription (1 = one-time product) — see
+// https://developer.android.com/google/play/billing/rtdn-reference#voided-purchase
+const VOIDED_SUBSCRIPTION_PRODUCT_TYPE = 2;
+
+async function downgradeToFree(
+  db: FirebaseFirestore.Firestore,
+  uid: string,
+  reason: string,
+  logContext: Record<string, unknown>
+): Promise<void> {
+  const userRef = db.collection('users').doc(uid);
+  // `cancel_at_period_end: false` — access is already revoked/expired, so there
+  // is no future cancellation still pending. Writing `true` alongside
+  // `tier:'free'` is self-contradictory and is exactly what
+  // isInconsistentSubscription() flags, which made every downgrade look broken
+  // to repairSubscriptionDoc() and caused a repair/re-dirty loop.
+  await userRef.update({
+    'subscription.tier': 'free',
+    'subscription.status': 'cancelled',
+    'subscription.cancel_at_period_end': false,
+    'subscription.updated_at': Timestamp.now(),
+  });
+  logger.info(reason, {uid, ...logContext});
+  await syncOwnerSubscriptionTier(db, uid, 'free').catch((err: any) =>
+    logger.error('Failed to sync ownerSubscriptionTier', {uid, message: err.message})
+  );
 }
 
 export const handlePlaySubscriptionNotification = onMessagePublished(
@@ -104,6 +138,44 @@ export const handlePlaySubscriptionNotification = onMessagePublished(
     if (payload.packageName !== PACKAGE_NAME) {
       logger.warn('Ignoring Play RTDN with mismatched packageName', {
         packageName: payload.packageName,
+      });
+      return;
+    }
+
+    const voided = payload.voidedPurchaseNotification;
+    if (voided) {
+      // Refund/chargeback — Play voids the purchase outright regardless of the
+      // subscription's own lifecycle state. Skip one-time-product voids (productType
+      // 1); only subscription purchases (productType 2) affect subscription.tier.
+      if (voided.productType !== VOIDED_SUBSCRIPTION_PRODUCT_TYPE) {
+        logger.info('Ignoring voided-purchase notification for non-subscription product', {
+          orderId: voided.orderId,
+          productType: voided.productType,
+        });
+        return;
+      }
+      const db = getFirestore();
+      const tokenRef = db.collection('purchaseTokens').doc(voided.purchaseToken);
+      const tokenDoc = await tokenRef.get();
+      if (!tokenDoc.exists) {
+        logger.warn('No uid mapping for voided purchaseToken', {
+          purchaseToken: voided.purchaseToken,
+          orderId: voided.orderId,
+        });
+        return;
+      }
+      const {uid, superseded} = tokenDoc.data() as {uid: string; superseded?: boolean};
+      if (superseded) {
+        logger.info('Ignoring voided-purchase notification for already-superseded purchaseToken', {
+          uid,
+          purchaseToken: voided.purchaseToken,
+        });
+        return;
+      }
+      await downgradeToFree(db, uid, 'Subscription purchase voided (refund/chargeback) — downgraded', {
+        purchaseToken: voided.purchaseToken,
+        orderId: voided.orderId,
+        refundType: voided.refundType,
       });
       return;
     }
@@ -155,6 +227,18 @@ export const handlePlaySubscriptionNotification = onMessagePublished(
     }
 
     const userRef = db.collection('users').doc(uid);
+
+    // Self-heal a contradictory subscription map before reading it. The plan-change
+    // guard and the tier fallback below both trust `currentSub`, so a doc left
+    // inconsistent by older partial writes would otherwise steer this handler with
+    // stale values. No-ops on healthy docs; Play remains the source of truth.
+    await repairSubscriptionDoc(db, uid).catch((err: any) =>
+      logger.error('Subscription repair threw — continuing with stored doc', {
+        uid,
+        message: err?.message,
+      })
+    );
+
     const userSnap = await userRef.get();
     const currentSub = userSnap.data()?.subscription;
 
@@ -196,20 +280,10 @@ export const handlePlaySubscriptionNotification = onMessagePublished(
       // Set tier to 'free' too (not just status) — access is genuinely gone (refund
       // or lapsed renewal), and usageService/household-inheritance sync both key off
       // the tier field changing, not status alone.
-      await userRef.update({
-        'subscription.tier': 'free',
-        'subscription.status': 'cancelled',
-        'subscription.cancel_at_period_end': true,
-        'subscription.updated_at': Timestamp.now(),
-      });
-      logger.info('Subscription revoked/expired — downgraded', {
-        uid,
+      await downgradeToFree(db, uid, 'Subscription revoked/expired — downgraded', {
         notificationType,
         purchaseToken,
       });
-      await syncOwnerSubscriptionTier(db, uid, 'free').catch((err: any) =>
-        logger.error('Failed to sync ownerSubscriptionTier', {uid, message: err.message})
-      );
       return;
     }
 

@@ -48,7 +48,10 @@ interface ShoppingListProps {
   items: ShoppingItem[];
   setItems: React.Dispatch<React.SetStateAction<ShoppingItem[]>>;
   onMoveToPantry: (items: ShoppingItem[]) => void;
-  addShoppingListItem: (item: Omit<ShoppingItem, 'id'>) => void;
+  // Returns a promise (useShoppingList.addShoppingListItem is async). Typed as
+  // `void` previously, which silently discarded the promise at every call site —
+  // await had no effect and write failures could not be caught.
+  addShoppingListItem: (item: Omit<ShoppingItem, 'id'>) => Promise<void> | void;
   user?: User;
   household?: Household | null;
   isLoadingShoppingList?: boolean;
@@ -781,18 +784,32 @@ const ShoppingListComponent: React.FC<ShoppingListProps> = ({
       priceData
     };
 
-    setItems(prev => [...prev, newShoppingItem]);
-
     // Track shopping list item addition
     AnalyticsService.trackShoppingListAdd(newItem, newShoppingItem.category);
 
     // Offline queue for sync
     if (!isOnline) {
+      // Offline: no write will land, so seed local state directly and let the
+      // queue replay it. Online, the write below round-trips through the cache
+      // listener instead — adding here too would double-render the item.
+      setItems(prev => [...prev, newShoppingItem]);
       addToQueue({
         type: 'add',
         collection: 'shoppingList',
         data: newShoppingItem
       });
+    } else {
+      // Persist through the same path as addSuggestedItem. This previously only
+      // called setItems(), so a manually-added item lived in local state and was
+      // gone on the next refresh.
+      try {
+        const { id: _id, ...itemWithoutId } = newShoppingItem;
+        await addShoppingListItem(itemWithoutId);
+      } catch (error) {
+        log.error('Failed to add shopping list item', { item: newItem, error }, 'ShoppingList');
+        addToast(`Failed to add ${newItem}. Please try again.`, 'error');
+        return;
+      }
     }
 
     setNewItem('');

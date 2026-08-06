@@ -1,6 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.wrapImpactTrackingUrl = exports.sendDailyReminders = exports.sendPushNotificationOnWrite = exports.retryPendingAccountDeletions = exports.deleteAccount = exports.handlePlaySubscriptionNotification = exports.verifyPurchase = exports.checkExpiredSubscriptions = exports.resetWeeklyUsageLimits = exports.getNutritionData = exports.migrateHouseholdClaims = exports.acceptInvitation = exports.checkInvitation = exports.removeHouseholdMember = exports.leaveHousehold = exports.inviteMember = void 0;
+exports.wrapImpactTrackingUrl = exports.sendDailyReminders = exports.sendPushNotificationOnWrite = exports.retryPendingAccountDeletions = exports.deleteAccount = exports.repairSubscriptions = exports.handlePlaySubscriptionNotification = exports.verifyPurchase = exports.checkExpiredSubscriptions = exports.resetWeeklyUsageLimits = exports.getNutritionData = exports.migrateHouseholdClaims = exports.acceptInvitation = exports.checkInvitation = exports.removeHouseholdMember = exports.leaveHousehold = exports.inviteMember = void 0;
 const v2_1 = require("firebase-functions/v2");
 (0, v2_1.setGlobalOptions)({ region: "us-east1" });
 var inviteMember_1 = require("./inviteMember");
@@ -25,6 +25,8 @@ var verifyPurchase_1 = require("./verifyPurchase");
 Object.defineProperty(exports, "verifyPurchase", { enumerable: true, get: function () { return verifyPurchase_1.verifyPurchase; } });
 var subscriptionNotifications_1 = require("./subscriptionNotifications");
 Object.defineProperty(exports, "handlePlaySubscriptionNotification", { enumerable: true, get: function () { return subscriptionNotifications_1.handlePlaySubscriptionNotification; } });
+var repairSubscriptions_1 = require("./repairSubscriptions");
+Object.defineProperty(exports, "repairSubscriptions", { enumerable: true, get: function () { return repairSubscriptions_1.repairSubscriptions; } });
 var deleteAccount_1 = require("./deleteAccount");
 Object.defineProperty(exports, "deleteAccount", { enumerable: true, get: function () { return deleteAccount_1.deleteAccount; } });
 Object.defineProperty(exports, "retryPendingAccountDeletions", { enumerable: true, get: function () { return deleteAccount_1.retryPendingAccountDeletions; } });

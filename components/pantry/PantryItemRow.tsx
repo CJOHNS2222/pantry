@@ -14,6 +14,9 @@ interface PantryItemRowProps {
   onSelectItem: (index: number) => void;
   /* eslint-disable-next-line @typescript-eslint/no-explicit-any */
   getRowActionHandlers: (item: DisplayedPantryItem) => any;
+  /** Returns true if a long-press/swipe already consumed this gesture. Optional
+   * so tile/grid callers that don't wire gestures keep working unchanged. */
+  consumeGestureSuppression?: () => boolean;
 }
 
 export const PantryItemRow: React.FC<PantryItemRowProps> = ({
@@ -23,11 +26,15 @@ export const PantryItemRow: React.FC<PantryItemRowProps> = ({
   onToggleSelect,
   onSelectItem,
   getRowActionHandlers,
+  consumeGestureSuppression,
 }) => {
   return (
     <div
       {...getRowActionHandlers(item)}
       onClick={() => {
+        // A long-press or swipe already handled this gesture; the trailing click
+        // must not also toggle selection or open the detail modal.
+        if (consumeGestureSuppression?.()) return;
         HapticService.light();
         if (bulkMode) {
           onToggleSelect(item.originalIndex);

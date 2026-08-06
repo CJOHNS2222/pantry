@@ -30,7 +30,7 @@ function createShoppingListListener(
     return DatabaseMonitoringService.onSnapshot(DatabaseMonitoringService.doc(cachePath), snap => {
       if (snap.exists()) {
         const data = snap.data() as ShoppingListCache;
-        if (data.metadata && data.metadata.version === ShoppingListCacheService.CACHE_VERSION) {
+        if (data.metadata && ShoppingListCacheService.isReadableCacheVersion(data.metadata.version)) {
           const items: ShoppingItem[] = [];
           for (const [itemId, itemArray] of Object.entries(data.items)) {
             items.push(ShoppingListCacheService.objectToShoppingItem(itemId, itemArray as CachedShoppingListData[string], householdId));
@@ -41,6 +41,16 @@ function createShoppingListListener(
             setShoppingList(sortedItems);
             prevShoppingListRef.current = structuredClone(sortedItems);
           }
+          if (data.metadata.version !== ShoppingListCacheService.CACHE_VERSION) {
+            void ShoppingListCacheService.migrateCacheVersion(householdId);
+          }
+        } else {
+          // Never fail closed silently: an unreadable version previously rendered
+          // an empty list with no error while writes kept landing in the doc.
+          log.warn('Household shopping list cache version not readable', {
+            found: data.metadata?.version,
+            expected: ShoppingListCacheService.CACHE_VERSION,
+          }, 'DataManagement');
         }
       } else {
         setShoppingList([]);
@@ -58,7 +68,7 @@ function createShoppingListListener(
     return DatabaseMonitoringService.onSnapshot(DatabaseMonitoringService.doc(cachePath), snap => {
       if (snap.exists()) {
         const data = snap.data() as ShoppingListCache;
-        if (data.metadata && data.metadata.version === ShoppingListCacheService.CACHE_VERSION) {
+        if (data.metadata && ShoppingListCacheService.isReadableCacheVersion(data.metadata.version)) {
           const items: ShoppingItem[] = [];
           for (const [itemId, itemArray] of Object.entries(data.items)) {
             items.push(ShoppingListCacheService.objectToShoppingItem(itemId, itemArray as CachedShoppingListData[string], undefined, userId));
@@ -69,6 +79,15 @@ function createShoppingListListener(
             setShoppingList(sortedItems);
             prevShoppingListRef.current = structuredClone(sortedItems);
           }
+          if (data.metadata.version !== ShoppingListCacheService.CACHE_VERSION) {
+            void ShoppingListCacheService.migrateCacheVersion(undefined, userId);
+          }
+        } else {
+          // See the household branch above — silent version mismatch was the bug.
+          log.warn('User shopping list cache version not readable', {
+            found: data.metadata?.version,
+            expected: ShoppingListCacheService.CACHE_VERSION,
+          }, 'DataManagement');
         }
       } else {
         setShoppingList([]);

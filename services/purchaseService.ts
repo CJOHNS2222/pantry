@@ -51,8 +51,58 @@ function getIAP(): any {
 let _initialized = false;
 let _currentUserId: string | null = null;
 
+// Last error returned by the server-side validator, surfaced to the user via the
+// unverified() handler (which receives only the receipt, not the failure reason).
+let _lastValidationError: string | null = null;
+
 // Resolvers for in-flight purchases, keyed by productId
 const _pendingResolvers = new Map<string, (ok: boolean, error?: string) => void>();
+
+// Hard ceiling on how long purchaseProduct() may stay unsettled. The verified/
+// unverified handlers resolve it on the happy paths, but both derive the productId
+// from the receipt shape — if that lookup misses (or neither handler ever fires),
+// the promise would otherwise hang forever and the UI pins on "Processing".
+const PURCHASE_TIMEOUT_MS = 90_000;
+
+/**
+ * Settle every in-flight resolver. Used when a receipt arrives whose productId
+ * can't be read, so we can still unblock the UI rather than leaving it hanging.
+ */
+function settleAllPending(ok: boolean, error?: string): void {
+  for (const [productId, resolver] of _pendingResolvers) {
+    resolver(ok, error);
+    _pendingResolvers.delete(productId);
+  }
+}
+
+/**
+ * Resolve the pending resolver for a receipt. Falls back to settling all
+ * in-flight purchases when the receipt's productId can't be determined —
+ * a shape mismatch must surface as an error, never as an indefinite spinner.
+ */
+function settleForReceipt(receipt: any, ok: boolean, error?: string): void {
+  // The verified/unverified handlers receive a Receipt whose product id may sit
+  // in either shape depending on plugin version — check the validator-body form
+  // (`id`) first, then the older nested transactions form. Getting this wrong
+  // silently drops the resolver and hangs the purchase promise.
+  const productId = (
+    typeof receipt?.id === 'string'
+      ? receipt.id
+      : receipt?.transactions?.[0]?.products?.[0]?.id
+  ) as ProductId | undefined;
+  const resolver = productId ? _pendingResolvers.get(productId) : undefined;
+  if (resolver) {
+    resolver(ok, error);
+    _pendingResolvers.delete(productId!);
+    return;
+  }
+  log.warn(
+    '[purchaseService] Could not map receipt to a pending purchase — settling all in-flight orders',
+    { ok, productId: productId ?? null, receiptKeys: receipt ? Object.keys(receipt) : null },
+    'purchaseService'
+  );
+  settleAllPending(ok, error);
+}
 
 /**
  * Initialize the Play Store and register subscription products.
@@ -120,7 +170,24 @@ export async function initializePurchaseStore(userId: string): Promise<void> {
       const result = await verifyFn({ receipt, userId: _currentUserId });
       callback({ ok: true, data: result.data as any });
     } catch (err: any) {
-      log.error('[purchaseService] Receipt validation failed', { error: err?.message }, 'purchaseService');
+      // Log the receipt shape alongside the failure: a `invalid-argument` from
+      // verifyPurchase means the server rejected this shape, and the keys are
+      // what identify which field it could not read.
+      log.error(
+        '[purchaseService] Receipt validation failed',
+        {
+          error: err?.message,
+          code: err?.code,
+          details: err?.details,
+          receiptKeys: receipt && typeof receipt === 'object' ? Object.keys(receipt) : null,
+          firstTransactionKeys:
+            Array.isArray(receipt?.transactions) && receipt.transactions[0]
+              ? Object.keys(receipt.transactions[0])
+              : null,
+        },
+        'purchaseService'
+      );
+      _lastValidationError = err?.message ?? null;
       callback({ ok: false, code: 'VERIFICATION_FAILED', message: err?.message ?? 'Unknown error' });
     }
   };
@@ -135,21 +202,17 @@ export async function initializePurchaseStore(userId: string): Promise<void> {
     .verified((receipt: any) => {
       // Verification succeeded — finish the transaction to acknowledge it to Play
       receipt.finish();
-      const productId = receipt.transactions?.[0]?.products?.[0]?.id as ProductId | undefined;
-      const resolver = productId ? _pendingResolvers.get(productId) : undefined;
-      if (resolver) {
-        resolver(true);
-        if (productId) _pendingResolvers.delete(productId);
-      }
+      _lastValidationError = null;
+      settleForReceipt(receipt, true);
     })
     .unverified((receipt: any) => {
-      // Verification failed — do not grant access
-      const productId = receipt.transactions?.[0]?.products?.[0]?.id as ProductId | undefined;
-      const resolver = productId ? _pendingResolvers.get(productId) : undefined;
-      if (resolver) {
-        resolver(false, 'Purchase could not be verified. Please try again.');
-        if (productId) _pendingResolvers.delete(productId);
-      }
+      // Verification failed — do not grant access. Prefer the validator's actual
+      // message so a shape/config failure is diagnosable instead of generic.
+      const reason = _lastValidationError
+        ? `Purchase could not be verified: ${_lastValidationError}`
+        : 'Purchase could not be verified. Please try again.';
+      _lastValidationError = null;
+      settleForReceipt(receipt, false, reason);
     });
 
   await store.initialize([Platform.GOOGLE_PLAY]);
@@ -212,9 +275,34 @@ export function purchaseProduct(productId: ProductId, oldPurchaseToken?: string)
     const offer = typeof product.getOffer === 'function' ? product.getOffer() : null;
     const orderTarget = offer || product;
 
-    // Store the resolver so the verified/unverified handlers can settle it
+    // Store the resolver so the verified/unverified handlers can settle it.
+    // Guarded so the promise settles exactly once, whichever path gets there
+    // first (handler, order error, or the timeout below).
+    let settled = false;
+    const timeoutId = window.setTimeout(() => {
+      if (settled) return;
+      _pendingResolvers.delete(productId);
+      log.error(
+        '[purchaseService] Purchase timed out awaiting verification',
+        { productId, timeoutMs: PURCHASE_TIMEOUT_MS },
+        'purchaseService'
+      );
+      settled = true;
+      resolve({
+        success: false,
+        error: 'Purchase is taking longer than expected. If you were charged, use Restore Purchases.',
+      });
+    }, PURCHASE_TIMEOUT_MS);
+
+    const settle = (result: PurchaseResult) => {
+      if (settled) return;
+      settled = true;
+      window.clearTimeout(timeoutId);
+      resolve(result);
+    };
+
     _pendingResolvers.set(productId, (ok, error) =>
-      resolve(ok ? { success: true } : { success: false, error })
+      settle(ok ? { success: true } : { success: false, error })
     );
 
     // On a plan change (upgrade/downgrade/crossgrade), pass the old purchase token so
@@ -226,12 +314,20 @@ export function purchaseProduct(productId: ProductId, oldPurchaseToken?: string)
       ? {additionalData: {googlePlay: {oldPurchaseToken, replacementMode: 'IMMEDIATE_WITH_TIME_PRORATION'}}}
       : undefined;
 
-    IAP.store.order(orderTarget, orderOptions).then((err: any) => {
-      if (err) {
+    IAP.store.order(orderTarget, orderOptions).then(
+      (err: any) => {
+        if (err) {
+          _pendingResolvers.delete(productId);
+          settle({ success: false, error: err.message ?? 'Order failed' });
+        }
+      },
+      (err: any) => {
+        // order() rejecting (rather than resolving with an error) would otherwise
+        // leave the promise pending until the timeout.
         _pendingResolvers.delete(productId);
-        resolve({ success: false, error: err.message ?? 'Order failed' });
+        settle({ success: false, error: err?.message ?? 'Order failed' });
       }
-    });
+    );
   });
 }
 

@@ -26,8 +26,17 @@ export const PantryBulkActionBar: React.FC<PantryBulkActionBarProps> = ({
   onOpenBulkQuantityEdit,
   onExitBulkMode,
 }) => {
+  // Sits directly above the fixed bottom nav (AppNavigation.tsx). `bottom-20`
+  // (5rem) matched the nav's height only on devices with no bottom inset — the
+  // nav is `bottom-0 pb-safe`, so its real height is 5rem PLUS the safe-area
+  // inset, and on Android gesture-nav devices it covered this bar's buttons by
+  // exactly that inset. `--app-nav-h` (src/index.css) already encodes the full
+  // height; the extra 0.5rem is breathing room between the two.
   return (
-    <div className="fixed bottom-20 left-4 right-4 max-w-lg mx-auto z-40 bg-theme-secondary border border-theme rounded-2xl p-3 shadow-2xl backdrop-blur-lg animate-slide-up flex flex-col gap-2">
+    <div
+      className="fixed left-4 right-4 max-w-lg mx-auto z-40 bg-theme-secondary border border-theme rounded-2xl p-3 shadow-2xl backdrop-blur-lg animate-slide-up flex flex-col gap-2"
+      style={{ bottom: 'calc(var(--app-nav-h) + 0.5rem)' }}
+    >
       <div className="flex items-center justify-between px-1">
         <span className="text-xs font-bold text-theme-primary">
           {selectedCount} item{selectedCount > 1 ? 's' : ''} selected

@@ -7,12 +7,34 @@
  * Called automatically by cordova-plugin-purchase via purchaseService.ts.
  *
  * ── Setup required in Play Console ──────────────────────────────────────────
- *  1. Play Console → Setup → API access → Link to your Google Cloud project.
- *  2. In Google Cloud IAM, grant the App Engine service account
- *     ({project-id}@appspot.gserviceaccount.com) the "Service Account Token Creator" role.
- *  3. In Play Console API access page, grant the linked service account
- *     at least "View financial data" permission.
- *  4. Enable the "Google Play Android Developer API" in Cloud Console API library.
+ * The identity that must be authorized is the function's RUNTIME service
+ * account. For Gen-2 Cloud Functions that is the Compute Engine default
+ * account, NOT the App Engine one:
+ *
+ *     {project-number}-compute@developer.gserviceaccount.com
+ *
+ * (An earlier version of this comment named {project-id}@appspot.gserviceaccount.com.
+ * Granting that account instead produces a Play API 401 `permissionDenied` on
+ * every purchase — the call is authenticated but the calling identity has no
+ * app access. Confirm the live value with:
+ *   gcloud functions describe verifyPurchase --region=us-east1 --gen2 \
+ *     --format='value(serviceConfig.serviceAccountEmail)'
+ * rather than assuming, since it changes if the function is redeployed with an
+ * explicit --service-account.)
+ *
+ *  1. Play Console → Setup → API access → link to your Google Cloud project.
+ *     The grant page only lists accounts from the linked project.
+ *  2. On that page, grant the runtime service account above:
+ *       - app access scoped to PACKAGE_NAME (com.smart.pantry), and
+ *       - "View financial data, orders, and cancellation survey responses"
+ *         — the permission purchases.subscriptions.get actually requires.
+ *  3. Enable the "Google Play Android Developer API" in the Cloud Console
+ *     API library.
+ *
+ * Play Console permission changes propagate on their own schedule — 15 minutes
+ * to a few hours is normal. A 401 immediately after granting does not mean the
+ * grant failed. The full Play rejection (code/status/apiError) is logged by the
+ * catch block below; `err.message` alone is empty and will not show the reason.
  * ────────────────────────────────────────────────────────────────────────────
  */
 
@@ -26,54 +48,81 @@ if (!getApps().length) {
   initializeApp();
 }
 
-export const verifyPurchase = onCall({ enforceAppCheck: false }, async (request) => {
+// 120s: default 60s was too tight once the Play API calls got explicit 15s timeouts
+// (see GOOGLE_API_TIMEOUT_MS in googlePlayHelpers.ts) — worst case is up to 4 Play API
+// calls (initial + 3 retries) plus backoff sleeps, which can approach 60s on its own.
+export const verifyPurchase = onCall({ enforceAppCheck: false, timeoutSeconds: 120 }, async (request) => {
   const uid = request.auth?.uid;
   if (!uid) {
     throw new HttpsError("unauthenticated", "Authentication required.");
   }
 
   const {receipt} = (request.data ?? {}) as {receipt: any; userId: string};
+
   if (!receipt || typeof receipt !== "object" || Array.isArray(receipt)) {
     throw new HttpsError("invalid-argument", "Receipt is required and must be an object.");
   }
 
   // ── Validate the cordova-plugin-purchase receipt shape before touching it ──
-  // Client input is untrusted: `receipt.transactions` must be a non-empty array,
-  // and the first entry must carry a string token + product id in one of the
-  // shapes the plugin emits, before we read anything off it.
-  if (!Array.isArray(receipt.transactions) || receipt.transactions.length === 0) {
+  // Client input is untrusted, so every field is checked before it is read.
+  //
+  // What the plugin actually sends is `CdvPurchase.Validator.Request.Body`
+  // (cordova-plugin-purchase v13.18, www/store.d.ts:6390), NOT a Receipt:
+  //   { id, type, offers[], transaction, additionalData, device }
+  // The Google purchase token lives on the SINGULAR `transaction` object
+  // (`ApiValidatorBodyTransactionGoogle`, store.d.ts:6525) as
+  // `transaction.purchaseToken`, with `transaction.type === 'android-playstore'`.
+  //
+  // An earlier version of this function expected a plural `transactions` array
+  // and rejected every real purchase with `invalid-argument` — note the offer
+  // tokens inside `offers[]` are catalog identifiers, NOT purchase tokens, so
+  // they must never be used here.
+  const transaction = receipt.transaction;
+  if (!transaction || typeof transaction !== "object" || Array.isArray(transaction)) {
+    logger.warn("verifyPurchase rejected: receipt.transaction missing or malformed", {
+      uid,
+      receiptKeys: Object.keys(receipt),
+    });
     throw new HttpsError(
       "invalid-argument",
-      "Invalid receipt: transactions must be a non-empty array."
+      "Invalid receipt: missing transaction details."
     );
   }
 
-  const transaction = receipt.transactions[0];
-  if (!transaction || typeof transaction !== "object" || Array.isArray(transaction)) {
-    throw new HttpsError("invalid-argument", "Invalid receipt: malformed transaction entry.");
-  }
-
-  // On GooglePlay, cordova-plugin-purchase v13 puts purchaseToken on the Receipt
-  // object, not the Transaction — CdvPurchase.GooglePlay.Receipt.purchaseToken,
-  // vs the base CdvPurchase.Transaction class which carries no token field at all.
+  // Primary path is `transaction.purchaseToken`; the rest are tolerated fallbacks
+  // for older/other plugin shapes so a future plugin change degrades gracefully
+  // rather than hard-failing every purchase again.
   const purchaseToken: string | undefined =
-    typeof receipt.purchaseToken === "string" ? receipt.purchaseToken :
     typeof transaction.purchaseToken === "string" ? transaction.purchaseToken :
-    typeof transaction.token === "string" ? transaction.token : undefined;
+    typeof transaction.token === "string" ? transaction.token :
+    typeof receipt.purchaseToken === "string" ? receipt.purchaseToken : undefined;
 
+  // Product id is the top-level `id` on the validator body. Fall back to the
+  // transaction's own product fields if a future shape moves it.
   const rawProductId: unknown =
-    (Array.isArray(transaction.products) && transaction.products[0]?.id !== undefined
-      ? transaction.products[0].id
-      : transaction.productId);
+    typeof receipt.id === "string" ? receipt.id :
+      (Array.isArray(transaction.products) && transaction.products[0]?.id !== undefined
+        ? transaction.products[0].id
+        : transaction.productId);
   const productId: string | undefined = typeof rawProductId === "string" ? rawProductId : undefined;
 
   if (!purchaseToken || purchaseToken.trim().length === 0) {
+    logger.warn("verifyPurchase rejected: no purchaseToken in any known field", {
+      uid,
+      receiptKeys: Object.keys(receipt),
+      transactionKeys: Object.keys(transaction),
+    });
     throw new HttpsError(
       "invalid-argument",
       "Invalid receipt: missing or non-string purchaseToken."
     );
   }
   if (!productId || productId.trim().length === 0) {
+    logger.warn("verifyPurchase rejected: no productId in any known field", {
+      uid,
+      transactionKeys: Object.keys(transaction),
+      productsIsArray: Array.isArray(transaction.products),
+    });
     throw new HttpsError(
       "invalid-argument",
       "Invalid receipt: missing or non-string productId."
@@ -82,6 +131,11 @@ export const verifyPurchase = onCall({ enforceAppCheck: false }, async (request)
 
   const tier = PRODUCT_TIER_MAP[productId];
   if (!tier) {
+    logger.warn("verifyPurchase rejected: productId not in PRODUCT_TIER_MAP", {
+      uid,
+      productId,
+      knownProducts: Object.keys(PRODUCT_TIER_MAP),
+    });
     throw new HttpsError("invalid-argument", `Unknown product: ${productId}`);
   }
 
@@ -117,10 +171,22 @@ export const verifyPurchase = onCall({ enforceAppCheck: false }, async (request)
     // trusting the client, and do NOT forward the raw error message to it —
     // internal API/config details (service account, project setup) shouldn't
     // leak to callers.
+    // googleapis errors put the useful detail on `response.data.error` /
+    // `code`, NOT on `message` (which is often empty) — logging only `message`
+    // here previously reduced a config failure to a blank string, hiding
+    // whether it was auth, permissions, or a bad product/token.
     logger.error(
       'Android Publisher API call failed. Ensure the Cloud Functions service account ' +
       'has Android Publisher API access (see setup instructions in functions/src/verifyPurchase.ts).',
-      { message: err.message }
+      {
+        message: err?.message ?? null,
+        code: err?.code ?? null,
+        status: err?.response?.status ?? null,
+        apiError: err?.response?.data?.error ?? null,
+        errors: err?.errors ?? null,
+        productId,
+        tokenPrefix: purchaseToken.slice(0, 12),
+      }
     );
     throw new HttpsError("internal", "Purchase verification failed. Please try again later.");
   }

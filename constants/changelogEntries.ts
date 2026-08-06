@@ -20,6 +20,15 @@ export interface DetailedChangeEntry {
 
 export const RECENT_CHANGES: ChangeEntry[] = [
   {
+    "version": "3.0.21",
+    "date": "Aug 6, 2026",
+    "highlights": [
+      "Pantry Scanner Optimization — Extracted quick-consume/swipe-gesture row handlers to a custom hook, reducing code…",
+      "Subscription Management & Purchase Security — Enhanced verification, subscription check loops, and RTDN handling for…",
+      "Shopping List Cache & Storage Optimization — Optimized offline caching and shopping list retrieval mechanics."
+    ]
+  },
+  {
     "version": "3.0.20",
     "date": "Aug 5, 2026",
     "highlights": [
@@ -38,20 +47,24 @@ export const RECENT_CHANGES: ChangeEntry[] = [
       "Recipe Finder Layout Spacing — Wrapped recipe finder search controls in a unified spacing container to eliminate…",
       "Gemini Search Images & Background Caching — Added high-quality Unsplash image matching for Gemini search results, and…"
     ]
-  },
-  {
-    "version": "3.0.18",
-    "date": "Aug 4, 2026",
-    "highlights": [
-      "App & Pantry Modularization — Refactored core monoliths into modular custom hooks and sub-components (PantryItemRow,…",
-      "Ubiquitous Haptic Feedback — Integrated haptic feedback across all buttons, shopping list actions, settings menus, and…",
-      "Hands-Free Cooking Mode Voice Commands — Added voice recognition & text-to-speech step reader to Cooking Mode (\"Next\",…",
-      "Mobile Touch Pull-To-Refresh & Nav Badges — Added pull-to-refresh touch gesture wrapper and dynamic navigation badge…"
-    ]
   }
 ];
 
 export const ALL_CHANGES: DetailedChangeEntry[] = [
+  {
+    "version": "3.0.21",
+    "date": "Aug 6, 2026",
+    "sections": [
+      {
+        "title": "Added / Changed / Fixed",
+        "bullets": [
+          "**Pantry Scanner Optimization** — Extracted quick-consume/swipe-gesture row handlers to a custom hook, reducing code complexity and improving component maintainability.",
+          "**Subscription Management & Purchase Security** — Enhanced verification, subscription check loops, and RTDN handling for plan changes, ensuring reliable billing state synchronizations.",
+          "**Shopping List Cache & Storage Optimization** — Optimized offline caching and shopping list retrieval mechanics."
+        ]
+      }
+    ]
+  },
   {
     "version": "3.0.20",
     "date": "Aug 5, 2026",

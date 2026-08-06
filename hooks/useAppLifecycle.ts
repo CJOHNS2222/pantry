@@ -111,7 +111,7 @@ export function useAppLifecycle({
           try {
             const status = await PushNotifications.checkPermissions();
             if (status.receive === 'granted') {
-              await pushNotificationService.initialize(user.id);
+              await pushNotificationService.initialize(user.id, user.needsFcmTokenRefresh === true);
             } else {
               log.debug('Skipping push notification initialization on startup: permission not granted', { status }, 'App');
             }

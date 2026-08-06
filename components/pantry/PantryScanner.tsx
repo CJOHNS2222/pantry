@@ -11,7 +11,6 @@ import { log } from '../../services/logService';
 import ItemDetailModal from './ItemDetailModal';
 import { PantryItemSkeleton } from '../ui/SkeletonLoader';
 import { generateIntelligentRecipeQuery, savePantryFilter, defaultPantryFilter, RecipeIngredientMatch, getMealPrepSuggestions } from '../../utils/searchUtils';
-import { getQuantityAmount } from '../../utils/quantityUtils';
 import { PantryService } from '../../services/pantryService';
 import { useApp } from '../../contexts/AppContext';
 import { useAppActions } from '../../contexts/AppActionsContext';
@@ -34,6 +33,7 @@ import PantryImportModal from './PantryImportModal';
 
 // New modular components & hook for PantryScanner
 import { usePantryFilterSort, DisplayedPantryItem } from './usePantryFilterSort';
+import { usePantryQuickConsume } from './usePantryQuickConsume';
 import { PantryItemRow } from './PantryItemRow';
 import { PantryItemTile } from './PantryItemTile';
 import { PantryBulkActionBar } from './PantryBulkActionBar';
@@ -129,7 +129,6 @@ const PantryScannerComponent: React.FC<PantryScannerProps> = ({
       if (importedTimerRef.current) {
         window.clearTimeout(importedTimerRef.current);
       }
-      clearLongPressTimer();
     };
   }, []);
 
@@ -307,113 +306,36 @@ const PantryScannerComponent: React.FC<PantryScannerProps> = ({
     return undefined;
   }, [bulkMode]);
 
-  const gestureStartRef = useRef<{ x: number; y: number } | null>(null);
-  const longPressTimerRef = useRef<number | null>(null);
-  const gestureActionTriggeredRef = useRef(false);
-
-  const clearLongPressTimer = () => {
-    if (longPressTimerRef.current) {
-      window.clearTimeout(longPressTimerRef.current);
-      longPressTimerRef.current = null;
-    }
-  };
-
-  const applyQuickConsume = useCallback(async (item: DisplayedPantryItem) => {
-    const original = inventory[item.originalIndex];
-    if (!original) return;
-
-    const previous = {
-      quantity: original.quantity,
-      quantity_estimate: original.quantity_estimate,
-      batches: original.batches,
-      consumptionHistory: original.consumptionHistory,
-    };
-
-    const { updatedItem } = PantryService.consumeFromItem(original, 1, 'FEFO');
-    const updates: Partial<PantryItem> = {
-      quantity: updatedItem.quantity,
-      batches: updatedItem.batches,
-      quantity_estimate: String(Math.max(0, Number(original.quantity_estimate || 0) - 1)),
-      consumptionHistory: [...(original.consumptionHistory || []), new Date().toISOString()],
-    };
-
-    await onUpdateItem(item.originalIndex, updates);
-    appActions.addToast('Consumed 1 unit', 'success', 5000, 'Undo', async () => {
-      await onUpdateItem(item.originalIndex, previous);
+  // Declared above usePantryQuickConsume because that hook takes it as an option
+  // (a `const` referenced before its initializer would be a TDZ error).
+  const toggleItemSelection = useCallback((index: number) => {
+    setSelectedItems(prev => {
+      const next = new Set(prev);
+      if (next.has(index)) next.delete(index);
+      else next.add(index);
+      return next;
     });
+  }, []);
 
-    const newQuantity = getQuantityAmount(updatedItem.quantity ?? updatedItem.quantity_estimate);
-    if (original.isStaple && newQuantity <= 0 && (settings.shopping?.autoReaddStaples !== false)) {
-      addToShoppingList([original.item]);
-      appActions.addToast(`${original.item} auto-added to shopping list (staple)`, 'info');
-    }
-  }, [inventory, onUpdateItem, appActions, addToShoppingList, settings.shopping?.autoReaddStaples]);
+  // Long-press on a row enters bulk mode with that row already selected, so bulk
+  // select is reachable without hunting for the toolbar button.
+  const enterBulkModeWithSelection = useCallback((index: number) => {
+    setBulkMode(true);
+    setSelectedItems(new Set([index]));
+    setBulkLocationValue('');
+  }, []);
 
-  const applyQuickAddToShopping = useCallback((item: DisplayedPantryItem) => {
-    addToShoppingList([item.item]);
-    appActions.addToast(`Added ${item.item} to shopping list`, 'info');
-  }, [addToShoppingList, appActions]);
-
-  const getRowActionHandlers = useCallback((item: DisplayedPantryItem) => {
-    return {
-      tabIndex: 0,
-      onContextMenu: (e: React.MouseEvent) => {
-        e.preventDefault();
-        setSelectedItemIndex(item.originalIndex);
-      },
-      onKeyDown: (e: React.KeyboardEvent) => {
-        if (bulkMode) return;
-        if (e.key === 'ArrowRight') {
-          e.preventDefault();
-          void applyQuickConsume(item);
-        } else if (e.key === 'ArrowLeft') {
-          e.preventDefault();
-          applyQuickAddToShopping(item);
-        } else if (e.key === 'Enter' || e.key === ' ') {
-          e.preventDefault();
-          setSelectedItemIndex(item.originalIndex);
-        }
-      },
-      onPointerDown: (e: React.PointerEvent) => {
-        if (bulkMode) return;
-        gestureStartRef.current = { x: e.clientX, y: e.clientY };
-        clearLongPressTimer();
-        longPressTimerRef.current = window.setTimeout(() => {
-          setSelectedItemIndex(item.originalIndex);
-        }, 550);
-      },
-      onPointerMove: (e: React.PointerEvent) => {
-        if (!gestureStartRef.current) return;
-        const dx = Math.abs(e.clientX - gestureStartRef.current.x);
-        const dy = Math.abs(e.clientY - gestureStartRef.current.y);
-        if (dx > 10 || dy > 10) {
-          clearLongPressTimer();
-        }
-      },
-      onPointerUp: async (e: React.PointerEvent) => {
-        clearLongPressTimer();
-        if (bulkMode || !gestureStartRef.current) return;
-        const dx = e.clientX - gestureStartRef.current.x;
-        const dy = e.clientY - gestureStartRef.current.y;
-        gestureStartRef.current = null;
-        if (Math.abs(dx) < 70 || Math.abs(dx) < Math.abs(dy)) return;
-        try {
-          if (dx > 0) {
-            gestureActionTriggeredRef.current = true;
-            await applyQuickConsume(item);
-          } else {
-            gestureActionTriggeredRef.current = true;
-            applyQuickAddToShopping(item);
-          }
-        } catch (err) {
-          console.error('Failed to execute swipe gesture action:', err);
-        }
-      },
-      onPointerLeave: () => {
-        clearLongPressTimer();
-      },
-    };
-  }, [bulkMode, applyQuickConsume, applyQuickAddToShopping]);
+  const { getRowActionHandlers, consumeGestureSuppression } = usePantryQuickConsume({
+    inventory,
+    bulkMode,
+    autoReaddStaples: settings.shopping?.autoReaddStaples !== false,
+    onUpdateItem,
+    addToShoppingList,
+    addToast: appActions.addToast,
+    onSelectItem: setSelectedItemIndex,
+    onLongPressSelect: enterBulkModeWithSelection,
+    onToggleSelect: toggleItemSelection,
+  });
 
   useEffect(() => {
     if (savedRecipes.length > 0 && inventory.length > 0) {
@@ -446,14 +368,6 @@ const PantryScannerComponent: React.FC<PantryScannerProps> = ({
     setBulkLocationValue('');
   }, [bulkMode]);
 
-  const toggleItemSelection = useCallback((index: number) => {
-    setSelectedItems(prev => {
-      const next = new Set(prev);
-      if (next.has(index)) next.delete(index);
-      else next.add(index);
-      return next;
-    });
-  }, []);
 
   const selectAllItems = useCallback(() => {
     if (selectedItems.size === inventory.length) {
@@ -800,6 +714,7 @@ const PantryScannerComponent: React.FC<PantryScannerProps> = ({
                           onToggleSelect={toggleItemSelection}
                           onSelectItem={setSelectedItemIndex}
                           getRowActionHandlers={getRowActionHandlers}
+                          consumeGestureSuppression={consumeGestureSuppression}
                         />
                       ))}
                     </div>
@@ -857,6 +772,7 @@ const PantryScannerComponent: React.FC<PantryScannerProps> = ({
                           onToggleSelect={toggleItemSelection}
                           onSelectItem={setSelectedItemIndex}
                           getRowActionHandlers={getRowActionHandlers}
+                          consumeGestureSuppression={consumeGestureSuppression}
                         />
                       ))}
                     </div>

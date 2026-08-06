@@ -319,6 +319,7 @@ export interface User {
   discoveredFeatures?: string[];
   dismissedTutorialTips?: string[];
   fcmTokens?: string[];
+  needsFcmTokenRefresh?: boolean;
   /** ISO date strings (YYYY-MM-DD), one per day a meal was marked "Cooked". See services/cookingStreakService.ts. */
   cookingStreakDates?: string[];
   lastActiveAt?: string | Date | { toDate(): Date };

@@ -1,3 +1,12 @@
+## [3.0.21] - 2026-08-06
+
+### Added / Changed / Fixed
+- **Pantry Scanner Optimization** — Extracted quick-consume/swipe-gesture row handlers to a custom hook, reducing code complexity and improving component maintainability.
+- **Subscription Management & Purchase Security** — Enhanced verification, subscription check loops, and RTDN handling for plan changes, ensuring reliable billing state synchronizations.
+- **Shopping List Cache & Storage Optimization** — Optimized offline caching and shopping list retrieval mechanics.
+
+---
+
 ## [3.0.20] - 2026-08-05
 
 ### Added / Changed / Fixed

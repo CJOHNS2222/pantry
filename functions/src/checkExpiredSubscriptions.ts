@@ -62,22 +62,40 @@ async function performExpiredSubscriptionCheck(): Promise<void> {
             sub.product_id,
             sub.purchase_token
           );
+          // Keep `tier` in step with what Play just told us. Updating status
+          // alone left a lapsed subscription sitting at a paid tier (and the
+          // household's inherited ownerSubscriptionTier stale with it), since
+          // entitlement checks key off tier, not status.
+          const lapsed = expiryMs < Date.now();
+          const tierUpdate = lapsed ? {'subscription.tier': 'free'} : {};
+
           await userDoc.ref.update({
+            ...tierUpdate,
             'subscription.status': status,
             'subscription.current_period_end': Timestamp.fromMillis(expiryMs),
-            'subscription.cancel_at_period_end': status === 'cancelled',
+            'subscription.cancel_at_period_end': !lapsed && status === 'cancelled',
             'subscription.updated_at': Timestamp.now(),
           });
+          if (lapsed) {
+            await syncOwnerSubscriptionTier(db, uid, 'free');
+          }
           if (status === 'cancelled' || status === 'past_due') {
             downgradedCount++;
           }
           logger.info('Re-synced stale subscription from Play', {uid, status, expiryMs});
         } else {
           // No token on file to re-verify against — access has genuinely lapsed.
+          //
+          // Write a COHERENT terminal state. This previously set
+          // `cancel_at_period_end: true` alongside `tier:'free'`, which is
+          // self-contradictory: the period has already ended, so there is no
+          // future cancellation pending. That combination is exactly what
+          // isInconsistentSubscription() flags, so the old write re-dirtied
+          // docs nightly and would fight repairSubscriptionDoc() indefinitely.
           await userDoc.ref.update({
             'subscription.tier': 'free',
             'subscription.status': 'cancelled',
-            'subscription.cancel_at_period_end': true,
+            'subscription.cancel_at_period_end': false,
             'subscription.updated_at': Timestamp.now(),
           });
           await syncOwnerSubscriptionTier(db, uid, 'free');

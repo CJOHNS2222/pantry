@@ -63,6 +63,45 @@ const shoppingItemToObject = (item: ShoppingItem): CachedShoppingListData[string
   return obj;
 };
 
+/**
+ * Cache versions whose `items` map `objectToShoppingItem` can still read.
+ *
+ * The v2.1 → 3 bump only dropped the `addedAt` field from newly-written items;
+ * it did not change the shape of anything else. `objectToShoppingItem` treats
+ * every field it reads as optional (`addedAt` falls back to `new Date()`,
+ * `unit`/`category` to `''`), so a v2.1 doc deserializes correctly today.
+ *
+ * Readers previously gated on `version === CACHE_VERSION` with no `else`, which
+ * silently rendered an empty list for anyone still on 2.1 — no error, no log —
+ * while `addItemToCache` kept appending to the doc via field-level `updateDoc`
+ * (which never restamps `metadata.version`). Writes accumulated into a document
+ * the reader would never accept. Accept the older version for reading and let
+ * `migrateCacheVersion` restamp it.
+ */
+const READABLE_CACHE_VERSIONS: readonly (number | string)[] = [CACHE_VERSION, 2.1, '2.1'];
+
+const isReadableCacheVersion = (version: unknown): boolean =>
+  version !== undefined && version !== null && READABLE_CACHE_VERSIONS.includes(version as number | string);
+
+/**
+ * Restamps a legacy-but-readable cache doc to the current version. Metadata-only:
+ * the items are already in a readable shape, so nothing is rewritten or dropped.
+ * Best-effort — a failure here must never block rendering, since the caller has
+ * already successfully deserialized the items it is about to display.
+ */
+const migrateCacheVersion = async (householdId?: string, userId?: string): Promise<void> => {
+  try {
+    const cacheRef = DatabaseMonitoringService.doc(getCachePath(householdId, userId));
+    await DatabaseMonitoringService.updateDoc(cacheRef, {
+      'metadata.version': CACHE_VERSION,
+      'metadata.lastUpdated': new Date(),
+    });
+    log.info('Migrated shopping list cache to current version', { to: CACHE_VERSION });
+  } catch (err: any) {
+    log.warn('Failed to migrate shopping list cache version', { err });
+  }
+};
+
 const objectToShoppingItem = (itemId: string, itemObject: CachedShoppingListData[string], _householdId?: string, _userId?: string): ShoppingItem => {
   const priceData = itemObject.priceData ? {
     ...itemObject.priceData,
@@ -95,15 +134,21 @@ const getCachedShoppingList = async (householdId?: string, userId?: string): Pro
 
     if (docSnap && docSnap.exists && (typeof (docSnap as any).exists === 'function' ? (docSnap as any).exists() : (docSnap as any).exists)) {
       const data = (docSnap as any).data() as ShoppingListCache;
-      // V2.1 cache structure
-      if (data.metadata && data.metadata.version === CACHE_VERSION) {
-        const items: ShoppingItem[] = Object.entries(data.items).map(([itemId, itemObject]) => 
+      if (data.metadata && isReadableCacheVersion(data.metadata.version)) {
+        const items: ShoppingItem[] = Object.entries(data.items).map(([itemId, itemObject]) =>
           objectToShoppingItem(itemId, itemObject as CachedShoppingListData[string], householdId, userId)
         );
-        // Loaded cached shopping list items from v2.1 cache
+        if (data.metadata.version !== CACHE_VERSION) {
+          void migrateCacheVersion(householdId, userId);
+        }
         // Sort alphabetically as addedAt is no longer reliable
         return items.sort((a, b) => a.item.localeCompare(b.item));
       }
+      // Unknown/newer version — surface it rather than silently returning empty.
+      log.warn('Shopping list cache version not readable; returning empty list', {
+        found: data.metadata?.version,
+        expected: CACHE_VERSION,
+      });
     }
 
     // No valid shopping list cache found
@@ -308,6 +353,8 @@ const clearCache = async (householdId?: string, userId?: string): Promise<void> 
 
 export const ShoppingListCacheService = {
   CACHE_VERSION,
+  isReadableCacheVersion,
+  migrateCacheVersion,
   objectToShoppingItem,
   getCachedShoppingList,
   getCachedShoppingListStrict,
