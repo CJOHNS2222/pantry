@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { getAuth } from 'firebase/auth';
 import { User } from '../types';
-import { NotificationService, AppNotification, NotificationSettings } from '../services/notificationService';
+import { NotificationService, AppNotification, NotificationSettings } from '../services/notificationBuilderService';
 import { log } from '../services/logService';
 
 const POLL_INTERVAL_MS = 5 * 60 * 1000;

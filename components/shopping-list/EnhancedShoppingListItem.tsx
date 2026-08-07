@@ -397,90 +397,92 @@ const EnhancedShoppingListItemComponent: React.FC<ShoppingListItemProps> = ({
             </button>
           )}
 
-          {onQuantityChange && (() => {
-            const parsed = parseQuantityAndUnit(item.quantity, item.item);
-            const converted = measurementSystem === 'Metric'
-              ? convertToMetric(parsed.amount, parsed.unit)
-              : convertToStandard(parsed.amount, parsed.unit);
-            const { amount, unit } = converted;
-            const smartUnits = getSmartUnits(item.item);
-            const commonUnits = ['pcs', 'dozen', 'lbs', 'kg', 'oz', 'g', 'cups', 'tbsp', 'tsp', 'ml', 'l', 'cans', 'bottles', 'packages', 'boxes', 'bags'];
-            
-            const standardUnitsToFilter = ['lbs', 'oz', 'cups', 'tbsp', 'tsp', 'gallons', 'quarts', 'pints'];
-            const metricUnitsToFilter = ['kg', 'g', 'ml', 'l'];
-            
-            const filteredSmart = smartUnits.filter(u => 
-              measurementSystem === 'Standard' ? !metricUnitsToFilter.includes(u) : !standardUnitsToFilter.includes(u)
-            );
-            const filteredCommon = commonUnits.filter(u => 
-              measurementSystem === 'Standard' ? !metricUnitsToFilter.includes(u) : !standardUnitsToFilter.includes(u)
-            );
-            
-            const allUnits = Array.from(new Set([...filteredSmart, ...filteredCommon]));
-            
-            return (
-              <div className="flex flex-col items-end gap-1" onClick={(e) => e.stopPropagation()}>
-                <div className="flex items-center gap-1">
-                  <input
-                    type="number"
-                    min="0"
-                    step="0.25"
-                    value={amount}
-                    onChange={(e) => {
-                      const newAmount = parseFloat(e.target.value) || 0;
-                      const newQuantityStr = unit === 'pcs' || unit === 'pieces' || unit === 'count' || unit === 'each'
-                        ? newAmount.toString()
-                        : `${newAmount} ${unit}`;
-                      onQuantityChange(item.id, newQuantityStr);
-                      onUpdateItem?.(item.id, { quantity: newQuantityStr, unit });
-                    }}
-                    className="w-12 h-[30px] px-1 py-1 text-sm border border-theme rounded bg-theme-primary text-theme-primary focus:outline-none focus:ring-1 focus:ring-[var(--accent-color)] text-center [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-                    placeholder="qty"
-                  />
-                  <select
-                    value={unit}
-                    onChange={(e) => {
-                      const newUnit = e.target.value;
-                      const convertedAmount = convertUnit(amount, unit, newUnit);
-                      const newQuantityStr = newUnit === 'pcs' || newUnit === 'pieces' || newUnit === 'count' || newUnit === 'each'
-                        ? convertedAmount.toString()
-                        : `${convertedAmount} ${newUnit}`;
-                      onQuantityChange(item.id, newQuantityStr);
-                      onUpdateItem?.(item.id, { quantity: newQuantityStr, unit: newUnit });
-                    }}
-                    className="w-18 h-[30px] px-1 text-xs border border-theme rounded bg-theme-primary text-theme-primary focus:outline-none focus:ring-1 focus:ring-[var(--accent-color)]"
-                  >
-                    {allUnits.map((u) => (
-                      <option key={u} value={u}>
-                        {u}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-                {(() => {
-                  const displayQty = formatItemQuantityForDisplay(item.quantity?.toString(), item.item, measurementSystem);
-                  if (!displayQty || displayQty === '1' || displayQty === '1 pcs') return null;
-                  return (
-                    <div className="text-[10px] text-theme-secondary opacity-80 pr-1 text-right">
-                      Needed: {displayQty}
-                    </div>
-                  );
-                })()}
-              </div>
-            );
-          })()}
+          <div className="flex flex-col items-end gap-1" onClick={(e) => e.stopPropagation()}>
+            {onQuantityChange && (() => {
+              const parsed = parseQuantityAndUnit(item.quantity, item.item);
+              const converted = measurementSystem === 'Metric'
+                ? convertToMetric(parsed.amount, parsed.unit)
+                : convertToStandard(parsed.amount, parsed.unit);
+              const { amount, unit } = converted;
+              const smartUnits = getSmartUnits(item.item);
+              const commonUnits = ['pcs', 'dozen', 'lbs', 'kg', 'oz', 'g', 'cups', 'tbsp', 'tsp', 'ml', 'l', 'cans', 'bottles', 'packages', 'boxes', 'bags'];
+              
+              const standardUnitsToFilter = ['lbs', 'oz', 'cups', 'tbsp', 'tsp', 'gallons', 'quarts', 'pints'];
+              const metricUnitsToFilter = ['kg', 'g', 'ml', 'l'];
+              
+              const filteredSmart = smartUnits.filter(u => 
+                measurementSystem === 'Standard' ? !metricUnitsToFilter.includes(u) : !standardUnitsToFilter.includes(u)
+              );
+              const filteredCommon = commonUnits.filter(u => 
+                measurementSystem === 'Standard' ? !metricUnitsToFilter.includes(u) : !standardUnitsToFilter.includes(u)
+              );
+              
+              const allUnits = Array.from(new Set([...filteredSmart, ...filteredCommon]));
+              
+              return (
+                <>
+                  <div className="flex items-center gap-1">
+                    <input
+                      type="number"
+                      min="0"
+                      step="0.25"
+                      value={amount}
+                      onChange={(e) => {
+                        const newAmount = parseFloat(e.target.value) || 0;
+                        const newQuantityStr = unit === 'pcs' || unit === 'pieces' || unit === 'count' || unit === 'each'
+                          ? newAmount.toString()
+                          : `${newAmount} ${unit}`;
+                        onQuantityChange(item.id, newQuantityStr);
+                        onUpdateItem?.(item.id, { quantity: newQuantityStr, unit });
+                      }}
+                      className="w-12 h-[30px] px-1 py-1 text-sm border border-theme rounded bg-theme-primary text-theme-primary focus:outline-none focus:ring-1 focus:ring-[var(--accent-color)] text-center [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                      placeholder="qty"
+                    />
+                    <select
+                      value={unit}
+                      onChange={(e) => {
+                        const newUnit = e.target.value;
+                        const convertedAmount = convertUnit(amount, unit, newUnit);
+                        const newQuantityStr = newUnit === 'pcs' || newUnit === 'pieces' || newUnit === 'count' || newUnit === 'each'
+                          ? convertedAmount.toString()
+                          : `${convertedAmount} ${newUnit}`;
+                        onQuantityChange(item.id, newQuantityStr);
+                        onUpdateItem?.(item.id, { quantity: newQuantityStr, unit: newUnit });
+                      }}
+                      className="w-18 h-[30px] px-1 text-xs border border-theme rounded bg-theme-primary text-theme-primary focus:outline-none focus:ring-1 focus:ring-[var(--accent-color)]"
+                    >
+                      {allUnits.map((u) => (
+                        <option key={u} value={u}>
+                          {u}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  {(() => {
+                    const displayQty = formatItemQuantityForDisplay(item.quantity?.toString(), item.item, measurementSystem);
+                    if (!displayQty || displayQty === '1' || displayQty === '1 pcs') return null;
+                    return (
+                      <div className="text-[10px] text-theme-secondary opacity-80 pr-1 text-right">
+                        Needed: {displayQty}
+                      </div>
+                    );
+                  })()}
+                </>
+              );
+            })()}
 
-          {showPriceData && (
-            item.estimatedPrice && item.estimatedPrice > 0 ? (
-              <div className="w-16 h-[30px] flex items-center justify-center text-xs font-medium text-green-600 dark:text-green-400 bg-green-500/10 dark:bg-green-500/20 px-1 rounded border border-green-500/20 text-center truncate" title={`~${formatCurrency(item.estimatedPrice)}`}>
-                ~{formatCurrency(item.estimatedPrice)}
-              </div>
-            ) : (
-              <div className="w-16 h-[30px] rounded border border-dashed border-theme/40 bg-theme-primary/20 flex items-center justify-center text-[10px] text-theme-secondary opacity-40">
-                —
-              </div>
-            )
-          )}
+            {showPriceData && (
+              item.estimatedPrice && item.estimatedPrice > 0 ? (
+                <div className="w-16 h-[28px] flex items-center justify-center text-xs font-medium text-green-600 dark:text-green-400 bg-green-500/10 dark:bg-green-500/20 px-1 rounded border border-green-500/20 text-center truncate" title={`~${formatCurrency(item.estimatedPrice)}`}>
+                  ~{formatCurrency(item.estimatedPrice)}
+                </div>
+              ) : (
+                <div className="w-16 h-[28px] rounded border border-dashed border-theme/40 bg-theme-primary/20 flex items-center justify-center text-[10px] text-theme-secondary opacity-40">
+                  —
+                </div>
+              )
+            )}
+          </div>
 
           {/* Chevron / Stacked Action Buttons */}
           {isSelected || isOpen ? (

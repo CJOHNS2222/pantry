@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { Users, Check, X, Bell } from 'lucide-react';
 import { useModalOpen } from '../../utils/useModalOpen';
 import { useFocusTrap } from '../../hooks/useFocusTrap';
-import { AppNotification } from '../../services/notificationService';
+import { AppNotification } from '../../services/notificationBuilderService';
 import { User } from '../../types';
 import { log } from '../../services/logService';
 

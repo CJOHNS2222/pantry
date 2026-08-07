@@ -6,8 +6,7 @@ import { ProgressiveImage } from '../ui/ProgressiveImage';
 
 interface Props {
   openRecipeModal: (recipe: StructuredRecipe, isSavedView: boolean) => void;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  onAddToPlan?: (r: any) => void;
+  onAddToPlan?: (r: StructuredRecipe) => void;
   user?: User | null;
   household?: Household | null;
   recipes?: StructuredRecipe[]; // Optional prop to avoid duplicate loading

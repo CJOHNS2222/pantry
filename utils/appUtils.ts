@@ -2297,6 +2297,23 @@ export function normalizeQuantity(quantity: ParsedQuantity): QuantityResult {
 }
 
 /**
+ * Convert an amount from one unit to another, when both are weight units or both
+ * are volume units (via their shared grams/ml basis in UNIT_CONVERSIONS). Returns
+ * null when the units aren't compatible (e.g. weight vs. volume, or either is a
+ * count unit like "each"/"clove") — callers must not assume conversion always
+ * succeeds, since count units have no consistent real-world size to convert by.
+ */
+export function convertQuantity(amount: number, fromUnit: string, toUnit: string): number | null {
+  const from = normalizeQuantity({ amount, unit: fromUnit });
+  if (from.normalizedGrams === undefined) return null;
+
+  const to = normalizeQuantity({ amount: 1, unit: toUnit });
+  if (to.normalizedGrams === undefined || to.normalizedKind !== from.normalizedKind) return null;
+
+  return from.normalizedGrams / to.normalizedGrams;
+}
+
+/**
  * Check if two quantities can be combined (same unit type)
  */
 export function canCombineQuantities(q1: ParsedQuantity, q2: ParsedQuantity): boolean {

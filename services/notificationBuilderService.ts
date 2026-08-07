@@ -6,7 +6,7 @@
 
 import DatabaseMonitoringService from './databaseMonitoringService';
 import { Timestamp } from 'firebase/firestore';
-import { appendNotificationToUser, snoozeNotificationInCache, updateNotificationInCache } from './notificationsService';
+import { appendNotificationToUser, snoozeNotificationInCache, updateNotificationInCache } from './notificationCacheService';
 import { formatDangerSummary, DangerItem } from './notificationHelpers';
 import { getFoodRiskLevel, generateExpirationMessage, getNotificationTone, generateNotificationStackMessage, generateWasteNotificationMessage } from '../utils/foodRiskClassification';
 
@@ -15,11 +15,11 @@ import { getFoodRiskLevel, generateExpirationMessage, getNotificationTone, gener
  * `NotificationService` (expiration alerts, recipe suggestions, household
  * activity, etc.) — the shape surfaced to in-app notification UI
  * (PendingNotifications, NotificationBanner, invite prompts). Distinct from
- * `NotificationCacheItem` in `notificationsService.ts`, which is the generic
+ * `NotificationCacheItem` in `notificationCacheService.ts`, which is the generic
  * shape of whatever is actually stored in the per-user Firestore cache
  * document (a superset, since it also accepts entries written without going
  * through this service). Renamed (F38) from a same-named type that used to
- * collide with the one in `notificationsService.ts`.
+ * collide with the one in `notificationCacheService.ts`.
  */
 export interface AppNotification {
   id: string;

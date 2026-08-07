@@ -4,6 +4,7 @@ import { Users, Mail, Plus, X, Settings, ChefHat } from 'lucide-react';
 import { getCallableFunction } from "../../firebaseConfig";
 import { PremiumFeature } from '../settings/PremiumFeature';
 import { Tab } from '../../types/app';
+import { useAppActions } from '../../contexts/AppActionsContext';
 import { serverTimestamp } from 'firebase/firestore';
 import { auth } from '../../firebaseConfig';
 import DatabaseMonitoringService from '../../services/databaseMonitoringService';
@@ -30,7 +31,8 @@ interface HouseholdManagerProps {
 }
 
 export const HouseholdManager: React.FC<HouseholdManagerProps> = ({ user, household, setHousehold, onClose, setActiveTab, addToast }) => {
-  
+
+  const { setActiveSettingsCategory } = useAppActions();
   const intl = useIntl();
   const confirm = useConfirm();
   const [inviteEmail, setInviteEmail] = useState('');
@@ -422,7 +424,7 @@ export const HouseholdManager: React.FC<HouseholdManagerProps> = ({ user, househ
             limit={2}
             currentCount={household?.members?.length ?? 0}
             fallbackMessage="Upgrade to Premium plan to add more than 2 household members"
-            onUpgrade={() => setActiveTab(Tab.SETTINGS)}
+            onUpgrade={() => { setActiveSettingsCategory('subscription'); setActiveTab(Tab.SETTINGS); }}
           >
             <div className="bg-theme-primary/40 p-4 rounded-xl border border-theme mb-6">
               <h3 className="text-sm font-bold text-[var(--accent-color)] uppercase mb-3">{intl.formatMessage({ id: 'household.inviteMember' })}</h3>

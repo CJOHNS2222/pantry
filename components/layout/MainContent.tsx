@@ -126,7 +126,7 @@ export const MainContent: React.FC = () => {
         user={user || undefined}
         savedRecipesCount={savedRecipes.length}
         showUpgradeCTA={true}
-        onUpgrade={() => { setActiveSettingsCategory('account_info'); setActiveTab(Tab.SETTINGS); }}
+        onUpgrade={() => { setActiveSettingsCategory('subscription'); setActiveTab(Tab.SETTINGS); }}
       />
 
 

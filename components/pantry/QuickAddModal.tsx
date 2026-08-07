@@ -8,6 +8,7 @@ import { useAndroidBack } from '../../hooks/useAndroidBack';
 import { useAppActions } from '../../contexts/AppActionsContext';
 import { log } from '../../services/logService';
 import { Input } from '../ui/Input';
+import { WebSpeechRecognition, getWebSpeechRecognitionCtor } from '../../types/webSpeech';
 
 interface QuickAddItem {
   name: string;
@@ -47,8 +48,7 @@ export const QuickAddModal: React.FC<QuickAddModalProps> = ({
   const inputRef = useRef<HTMLInputElement>(null);
 
   // Voice recognition setup
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const recognitionRef = useRef<any>(null);
+  const recognitionRef = useRef<WebSpeechRecognition | null>(null);
 
   useEffect(() => {
     if (isOpen) {
@@ -59,25 +59,21 @@ export const QuickAddModal: React.FC<QuickAddModalProps> = ({
   }, [isOpen]);
 
   useEffect(() => {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const win: any = window;
-    if (win.webkitSpeechRecognition || win.SpeechRecognition) {
-      const SpeechRecognition = win.SpeechRecognition || win.webkitSpeechRecognition;
+    const WebSpeech = getWebSpeechRecognitionCtor();
+    if (WebSpeech) {
       try {
-        recognitionRef.current = new SpeechRecognition();
+        recognitionRef.current = new WebSpeech();
         recognitionRef.current.continuous = false;
         recognitionRef.current.interimResults = false;
         recognitionRef.current.lang = intl.locale || 'en-US'; // updated at start() time too
 
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        recognitionRef.current.onresult = (event: any) => {
+        recognitionRef.current.onresult = (event) => {
           const transcript = event.results?.[0]?.[0]?.transcript;
           if (transcript) setInput(transcript);
           setIsListening(false);
         };
 
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        recognitionRef.current.onerror = (ev: any) => {
+        recognitionRef.current.onerror = (ev) => {
           setIsListening(false);
           const errorCode: string = ev?.error || '';
           if (errorCode !== 'no-speech' && errorCode !== 'aborted') {

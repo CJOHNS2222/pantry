@@ -1,3 +1,12 @@
+## [3.0.23] - 2026-08-07
+
+### Added / Changed / Fixed
+- **Renamed notification services for clarity** — `notificationService.ts` and `notificationsService.ts` are now `notificationBuilderService.ts` and `notificationCacheService.ts`, removing the confusing near-identical filenames.
+- **Removed remaining `any` types** across dashboards, modals, and pantry/recipe components — dashboard metrics, performance entries, and recipe/rating handlers are now fully typed for better editor support and fewer runtime surprises.
+- **Added a typed Web Speech Recognition surface** shared by voice-input features, replacing ad-hoc per-component shims.
+
+---
+
 ## [3.0.22] - 2026-08-06
 
 ### Added / Changed / Fixed

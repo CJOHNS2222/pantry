@@ -2,7 +2,7 @@ import DatabaseMonitoringService from './databaseMonitoringService';
 import { InventoryCacheService } from './inventoryCacheService';
 import { Member, Household } from '../types';
 import { checkInventoryAgainstHouseholdAllergies } from '../utils/preferenceUtils';
-import { NotificationService } from './notificationService';
+import { NotificationService } from './notificationBuilderService';
 import { log } from './logService';
 
 /**

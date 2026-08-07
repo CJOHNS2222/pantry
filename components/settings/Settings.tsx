@@ -13,9 +13,9 @@ import { User, UserProfile, CustomCategory, Member } from '../../types';
 import type { Settings as AppSettings } from '../../types';
 
 type MemberPreferences = Pick<Member, 'dietaryRestrictions' | 'allergies' | 'dietGoal' | 'favoriteCuisines' | 'specialNeeds' | 'preferredProteins' | 'dislikedIngredients'>;
-import { NotificationService, NotificationSettings } from '../../services/notificationService';
+import { NotificationService, NotificationSettings } from '../../services/notificationBuilderService';
 import { DayPlan } from '../../types';
-import { Loader2, Heart, AlertTriangle, X, Settings as SettingsIcon, User as UserIcon, ChevronLeft, ChevronRight, Sliders, Bell, TrendingDown, MessageSquare, HelpCircle, RefreshCw, Sparkles, Shield } from 'lucide-react';
+import { Loader2, Heart, AlertTriangle, X, Settings as SettingsIcon, User as UserIcon, ChevronLeft, ChevronRight, Sliders, Bell, TrendingDown, MessageSquare, HelpCircle, RefreshCw, Sparkles, Shield, Star } from 'lucide-react';
 import { userOptedInToGemini, setUserGeminiOptIn, getGeminiUsage } from '../../services/featureFlags';
 
 import { Household } from '../../types';
@@ -697,6 +697,24 @@ const SettingsComponent: React.FC<SettingsProps> = ({
               <ChevronRight className="w-4 h-4 text-theme-secondary" />
             </button>
 
+            {/* Subscription */}
+            <button
+              onClick={() => { HapticService.light(); setActiveCategory('subscription'); }}
+              className="w-full flex items-center justify-between p-4 hover:bg-theme-primary/5 transition-colors text-left focus:outline-none"
+              data-category="subscription"
+            >
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-[var(--accent-color)]/10 flex items-center justify-center text-[var(--accent-color)]">
+                  <Star className="w-5 h-5" />
+                </div>
+                <div>
+                  <span className="font-semibold text-theme-primary block text-sm">Subscription</span>
+                  <span className="text-[11px] text-theme-secondary opacity-70">Plan, billing, upgrade or manage premium</span>
+                </div>
+              </div>
+              <ChevronRight className="w-4 h-4 text-theme-secondary" />
+            </button>
+
             {/* Preferences */}
             <button
               onClick={() => { HapticService.light(); setActiveCategory('preferences'); }}
@@ -1237,12 +1255,7 @@ const SettingsComponent: React.FC<SettingsProps> = ({
               isPremium={isPremium}
               isFamily={isFamily}
               usageLimits={usageLimits}
-              onOpenUpgrade={() => setActiveCategory('account_info')}
-            />
-
-            <SettingsSubscriptionSection
-              user={user}
-              title={intl.formatMessage({ id: 'settings.subscription' })}
+              onOpenUpgrade={() => setActiveCategory('subscription')}
             />
 
             <SettingsHouseholdSection
@@ -1377,6 +1390,13 @@ const SettingsComponent: React.FC<SettingsProps> = ({
             <SettingsRemoteConfigDebugSection
               isAdmin={isAdmin}
               addToast={addToast}
+            />
+          </>}
+
+          {activeCategory === 'subscription' && <>
+            <SettingsSubscriptionSection
+              user={user}
+              title={intl.formatMessage({ id: 'settings.subscription' })}
             />
           </>}
 

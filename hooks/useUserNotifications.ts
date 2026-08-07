@@ -1,5 +1,5 @@
 import { useEffect, useState, useRef } from 'react';
-import { listenToUserNotifications, NotificationCacheItem } from '../services/notificationsService';
+import { listenToUserNotifications, NotificationCacheItem } from '../services/notificationCacheService';
 
 export function useUserNotifications(uid?: string, throttleMs = 1000) {
   const [items, setItems] = useState<NotificationCacheItem[]>([]);

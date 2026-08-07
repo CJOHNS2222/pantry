@@ -1,7 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import { Bell, Clock, Check, X, AlertCircle } from 'lucide-react';
-import { AppNotification } from '../../services/notificationService';
-import { markNotificationRead, snoozeNotificationInCache, updateNotificationInCache } from '../../services/notificationsService';
+import { AppNotification } from '../../services/notificationBuilderService';
+import { markNotificationRead, snoozeNotificationInCache, updateNotificationInCache } from '../../services/notificationCacheService';
 import { User } from '../../types';
 import { joinHousehold } from '../../services/householdService';
 import { useAppActions } from '../../contexts/AppActionsContext';

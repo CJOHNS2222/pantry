@@ -1,9 +1,8 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
-import { DayPlan, MealPlanItem, PantryItem, StructuredRecipe, User, SavedRecipe, ShoppingItem } from '../../types';
+import { DayPlan, MealPlanItem, PantryItem, StructuredRecipe, User, SavedRecipe, ShoppingItem, RecipeRating } from '../../types';
 import RecipeModal from './RecipeModal';
 import { RecipeModalDeductPantryModal } from '../recipe-modal/RecipeModalDeductPantryModal';
 import { MealPrepPlanner } from './MealPrepPlanner';
-import { PremiumFeature } from '../settings/PremiumFeature';
 import { Tab } from '../../types/app';
 // Firestore access is instrumented via DatabaseMonitoringService when needed
 import { parseIngredientForShoppingList } from '../../utils/appUtils';
@@ -95,8 +94,7 @@ interface MealPlannerProps {
   onAddToPlan?: (recipe: StructuredRecipe, dayIndex?: number, mealType?: 'breakfast' | 'lunch' | 'dinner') => void;
   onSaveRecipe?: (recipe: StructuredRecipe) => void;
   onMarkAsMade?: (recipe: StructuredRecipe, deductions?: { itemId: string; ingredient: string }[]) => void;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  onRate?: (rating: any) => void;
+  onRate?: (rating: RecipeRating) => void;
   user: User;
   setActiveTab: (tab: Tab) => void;
   recipeSaveLimitExceeded?: boolean;
@@ -109,7 +107,7 @@ interface MealPlannerProps {
 }
 
 const MealPlannerComponent: React.FC<MealPlannerProps> = ({ mealPlan, updateMealPlan, inventory, shoppingList, addToShoppingList, onAddToPlan, onSaveRecipe, onMarkAsMade, onRate, user, setActiveTab, recipeSaveLimitExceeded = false, mealPlanLimitExceeded = false, isLoadingMealPlan = false, savedRecipes: propSavedRecipes = [], settings }) => {
-  const { addToast } = useAppActions();
+  const { addToast, setActiveSettingsCategory } = useAppActions();
   const intl = useIntl();
   const { household } = useApp();
   const { isPremium, isFamily } = useSubscription(user);
@@ -1123,24 +1121,6 @@ const MealPlannerComponent: React.FC<MealPlannerProps> = ({ mealPlan, updateMeal
       )}
 
       {subTab === 'schedule' && (
-      <PremiumFeature
-        feature="mealPlanning"
-        user={user}
-        limit={10}
-        currentCount={(() => {
-          const now = new Date();
-          const weekStart = new Date(now);
-          weekStart.setDate(now.getDate() - now.getDay());
-          weekStart.setHours(0, 0, 0, 0);
-          // Only count entries in the current week or future weeks — past entries
-          // should never count against the user's quota.
-          return mealPlan
-            .filter(day => new Date(day.date) >= weekStart)
-            .reduce((total, day) => total + (day.breakfast?.length || 0) + (day.lunch?.length || 0) + (day.dinner?.length || 0), 0);
-        })()}
-        fallbackMessage="Upgrade to Premium to plan more than 10 meals per week"
-        onUpgrade={() => setActiveTab(Tab.SETTINGS)}
-      >
         <MealPlannerPremiumContent
           userId={user?.id}
           missingItemsCount={missingItemsCount}
@@ -1198,7 +1178,7 @@ const MealPlannerComponent: React.FC<MealPlannerProps> = ({ mealPlan, updateMeal
           hasMealsLabel={intl.formatMessage({ id: 'mealPlanner.hasMeals' })}
           onSetCalendarExpanded={setIsCalendarExpanded}
           onUpgradeMonthView={() => {
-            addToast('Monthly planning is a Family plan feature.', 'info', 5000, 'Upgrade', () => setActiveTab(Tab.SETTINGS));
+            addToast('Monthly planning is a Family plan feature.', 'info', 5000, 'Upgrade', () => { setActiveSettingsCategory('subscription'); setActiveTab(Tab.SETTINGS); });
           }}
           onPrevMonth={() => {
             const newMonth = new Date(currentCalendarMonth);
@@ -1237,7 +1217,7 @@ const MealPlannerComponent: React.FC<MealPlannerProps> = ({ mealPlan, updateMeal
           onPrevDay={() => setCurrentDayIndex(Math.max(0, currentDayIndex - 1))}
           onNextDay={() => {
             if (!canUseTwoWeekPlanning && currentDayIndex >= 6) {
-              addToast('Planning beyond 7 days requires Premium.', 'info', 5000, 'Upgrade', () => setActiveTab(Tab.SETTINGS));
+              addToast('Planning beyond 7 days requires Premium.', 'info', 5000, 'Upgrade', () => { setActiveSettingsCategory('subscription'); setActiveTab(Tab.SETTINGS); });
               return;
             }
             setCurrentDayIndex(Math.min(displayPlan.length - 1, currentDayIndex + 1));
@@ -1276,7 +1256,6 @@ const MealPlannerComponent: React.FC<MealPlannerProps> = ({ mealPlan, updateMeal
             setDragOverTrash(false);
           }}
         />
-      </PremiumFeature>
       )}
 
       <RecipeSearchOverlay

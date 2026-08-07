@@ -54,10 +54,10 @@ export function usePantryScan(
       setRawBase64(image.base64String);
       setImagePreview(`data:${calculatedMimeType};base64,${image.base64String}`);
       setLoadingState(LoadingState.IDLE);
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    } catch (err: any) {
+    } catch (err) {
       setLoadingState(LoadingState.IDLE);
-      if (err?.message !== 'User cancelled photos app' && err?.message !== 'User cancelled camera app') {
+      const message = err instanceof Error ? err.message : undefined;
+      if (message !== 'User cancelled photos app' && message !== 'User cancelled camera app') {
         log.error('Camera capture failed', { error: err });
         setImageAnalyzeError('Failed to capture photo. Please try again.');
         addToast?.('Failed to capture photo.', 'error');
@@ -89,11 +89,10 @@ export function usePantryScan(
       setScanResults(formattedResults);
       setShowScanReviewModal(true);
       setLoadingState(LoadingState.IDLE);
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    } catch (err: any) {
+    } catch (err) {
       log.error('Receipt analysis failed', { error: err });
       setLoadingState(LoadingState.IDLE);
-      setImageAnalyzeError(err?.message || 'Failed to analyze receipt.');
+      setImageAnalyzeError(err instanceof Error ? err.message : 'Failed to analyze receipt.');
       addToast?.('Failed to analyze receipt.', 'error');
     }
   }, [addToast]);

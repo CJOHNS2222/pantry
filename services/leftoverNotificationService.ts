@@ -1,6 +1,6 @@
 import { LeftoverService } from './leftoverService'
-import { NotificationService, AppNotification } from './notificationService'
-import { pruneNotificationsForDeletedItems } from './notificationsService'
+import { NotificationService, AppNotification } from './notificationBuilderService'
+import { pruneNotificationsForDeletedItems } from './notificationCacheService'
 import AnalyticsService from './analyticsService'
 import { log } from './logService'
 import DatabaseMonitoringService from './databaseMonitoringService'

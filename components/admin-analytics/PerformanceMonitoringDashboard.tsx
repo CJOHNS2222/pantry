@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import DatabaseMonitoringService from '../../services/databaseMonitoringService';
+import DatabaseMonitoringService, { DatabaseMetrics } from '../../services/databaseMonitoringService';
 import { log } from '../../services/logService';
 
 interface CoreWebVitals {
@@ -43,8 +43,7 @@ const PerformanceMonitoringDashboard: React.FC<PerformanceMonitoringDashboardPro
   });
   const [_componentMetrics, _setComponentMetrics] = useState<Map<string, ComponentRenderMetrics>>(new Map());
   const [networkRequests, setNetworkRequests] = useState<NetworkRequest[]>([]);
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const [dbMetrics, setDbMetrics] = useState<any>(null);
+  const [dbMetrics, setDbMetrics] = useState<(DatabaseMetrics & { sessionDuration: number }) | null>(null);
 
   // Track component renders
   const _renderTracker = useRef<Map<string, { count: number; times: number[]; startTime: number }>>(new Map());
@@ -66,9 +65,8 @@ const PerformanceMonitoringDashboard: React.FC<PerformanceMonitoringDashboardPro
 
           // First Input Delay
           const fidObserver = new PerformanceObserver((list) => {
-            const entries = list.getEntries();
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            entries.forEach((entry: any) => {
+            const entries = list.getEntries() as PerformanceEventTiming[];
+            entries.forEach((entry) => {
               setCoreWebVitals(prev => ({ ...prev, fid: entry.processingStart - entry.startTime }));
             });
           });
@@ -77,9 +75,8 @@ const PerformanceMonitoringDashboard: React.FC<PerformanceMonitoringDashboardPro
           // Cumulative Layout Shift
           const clsObserver = new PerformanceObserver((list) => {
             let clsValue = 0;
-            const entries = list.getEntries();
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            entries.forEach((entry: any) => {
+            const entries = list.getEntries() as (PerformanceEntry & { hadRecentInput: boolean; value: number })[];
+            entries.forEach((entry) => {
               if (!entry.hadRecentInput) {
                 clsValue += entry.value;
               }
@@ -98,9 +95,8 @@ const PerformanceMonitoringDashboard: React.FC<PerformanceMonitoringDashboardPro
 
           // Time to First Byte
           const navigationObserver = new PerformanceObserver((list) => {
-            const entries = list.getEntries();
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            entries.forEach((entry: any) => {
+            const entries = list.getEntries() as PerformanceNavigationTiming[];
+            entries.forEach((entry) => {
               setCoreWebVitals(prev => ({ ...prev, ttfb: entry.responseStart - entry.requestStart }));
             });
           });
@@ -126,9 +122,8 @@ const PerformanceMonitoringDashboard: React.FC<PerformanceMonitoringDashboardPro
       if ('PerformanceObserver' in window) {
         try {
           const networkObserver = new PerformanceObserver((list) => {
-            const entries = list.getEntries();
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            const newRequests: NetworkRequest[] = entries.map((entry: any) => ({
+            const entries = list.getEntries() as PerformanceResourceTiming[];
+            const newRequests: NetworkRequest[] = entries.map((entry) => ({
               url: entry.name,
               method: 'GET', // Default, could be enhanced
               status: 200, // Default, could be enhanced

@@ -2,7 +2,7 @@ import React from 'react';
 import { Bell } from 'lucide-react';
 import { NotificationSettingsComponent } from './NotificationSettings';
 import { User } from '../../types';
-import { NotificationSettings } from '../../services/notificationService';
+import { NotificationSettings } from '../../services/notificationBuilderService';
 
 interface SettingsNotificationsSectionProps {
   title: string;

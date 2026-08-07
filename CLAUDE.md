@@ -59,14 +59,6 @@ All Firestore reads/writes for pantry, shopping, meal plan, recipes must go thro
 - Avoid bash heredocs for file content — use the Write tool instead.
 - Never run slash commands (`/verify`, `/graphify`, etc.) as shell commands — they're Claude Code commands, not executables on PATH.
 
-## graphify
-Project has knowledge graph at graphify-out/ with god nodes, community structure, cross-file relationships.
-
-Rules:
-- Codebase questions: run `graphify query "<question>"` first when graphify-out/graph.json exists. Use `graphify path "<A>" "<B>"` for relationships, `graphify explain "<concept>"` for focused concepts. Returns scoped subgraph, usually much smaller than GRAPH_REPORT.md or raw grep output.
-- Read graphify-out/GRAPH_REPORT.md only for broad architecture review or when query/path/explain don't surface enough context.
-- After modifying code, run `graphify update .` to keep graph current (AST-only, no API cost).
-
 ## Bash/tool hygiene
 - Use absolute paths in every Bash command; never `cd` into repo first (working directory already correct, `cd` resets across calls).
 - Use Grep/Read/Glob tools instead of shell `grep`/`cat`/`find` - faster, respect `.gitignore`, don't dump raw output into context.
@@ -83,3 +75,6 @@ Rules:
 
 ## Subagents (`.claude/agents/`)
 24 predefined subagents + documented workflows (`full-audit`, `pre-commit`, `pre-deploy`, `new-feature`, `bug-fix`, `release-prep`). Full roster: vault `Subagents and Workflows` note. Auditor outputs go to `.claude/audits/`.
+
+## Memory
+At the end of a turn, report anything learned during it that's worth saving to memory (per the memory-system instructions) — corrections, confirmed approaches, project facts/decisions, external-system pointers — even if the user didn't explicitly ask. Don't wait to be asked "anything worth remembering?"

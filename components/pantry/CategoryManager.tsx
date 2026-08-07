@@ -7,6 +7,7 @@ import { CustomCategory } from '../../types';
 import { getCategoryIcon, getCategoryColor } from '../../utils/appUtils';
 import AnalyticsService from '../../services/analyticsService';
 import { useApp } from '../../contexts/AppContext';
+import { useAppActions } from '../../contexts/AppActionsContext';
 import { Tab } from '../../types/app';
 import { PaywallPrompt } from '../ui/PaywallPrompt';
 
@@ -47,6 +48,7 @@ export const CategoryManager: React.FC<CategoryManagerProps> = ({
   useKeyboardNavigation({ onEscape: onClose, enabled: isOpen });
   const modalRef = useFocusTrap({ isActive: isOpen });
   const { setActiveTab } = useApp();
+  const { setActiveSettingsCategory } = useAppActions();
   const [isAdding, setIsAdding] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [formData, setFormData] = useState({
@@ -124,7 +126,7 @@ export const CategoryManager: React.FC<CategoryManagerProps> = ({
               title="Free plan limit reached"
               message={`You've used your ${maxCategories} free custom category. Upgrade to Premium or Family for unlimited categories — starting at $4.99/mo.`}
               subMessage="Go to Settings → More → Subscription to upgrade."
-              onUpgrade={() => setActiveTab(Tab.SETTINGS)}
+              onUpgrade={() => { setActiveSettingsCategory('subscription'); setActiveTab(Tab.SETTINGS); }}
             />
           )}
           {(isAdding || editingId) && (

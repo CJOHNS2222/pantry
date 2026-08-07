@@ -1,8 +1,8 @@
 import { useEffect, useCallback } from 'react';
 import { User, PantryItem, Household } from '../types';
 import { Tab } from '../types/app';
-import { AppNotification, NotificationService } from '../services/notificationService';
-import { markNotificationRead, deleteNotification, snoozeNotificationInCache, updateNotificationInCache } from '../services/notificationsService';
+import { AppNotification, NotificationService } from '../services/notificationBuilderService';
+import { markNotificationRead, deleteNotification, snoozeNotificationInCache, updateNotificationInCache } from '../services/notificationCacheService';
 import { joinHousehold } from '../services/householdService';
 import { migrateUserDataToHousehold } from '../services/householdMigrationService';
 import { log } from '../services/logService';

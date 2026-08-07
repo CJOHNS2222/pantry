@@ -4,7 +4,7 @@ import { DayPlan, PantryItem, ShoppingItem } from '../../types';
 import { Tab } from '../../types/app';
 import { groceryPriceService, PriceData } from '../../services/groceryPriceService';
 import { formatCurrency } from '../../services/currencyService';
-import { parseIngredientForShoppingList, consolidateShoppingList } from '../../utils/appUtils';
+import { parseIngredientForShoppingList, consolidateShoppingList, convertQuantity } from '../../utils/appUtils';
 import { useAppActions } from '../../contexts/AppActionsContext';
 import { useApp } from '../../contexts/AppContext';
 import { log } from '../../services/logService';
@@ -27,7 +27,7 @@ interface IngredientCost {
 }
 
 export const GroceryCostEstimator: React.FC<GroceryCostEstimatorProps> = ({ mealPlan, inventory, onEstimatorToggle, freeItemLimit }) => {
-  const { addToast, setActiveTab } = useAppActions();
+  const { addToast, setActiveTab, setActiveSettingsCategory } = useAppActions();
   const { user } = useApp();
   const [showEstimator, setShowEstimator] = useState(false);
   const [customPrices, setCustomPrices] = useState<Record<string, number>>({});
@@ -130,56 +130,6 @@ export const GroceryCostEstimator: React.FC<GroceryCostEstimatorProps> = ({ meal
     }
   };
 
-  // Common ingredient prices per unit (USD) - Updated 2024 prices
-  const defaultPrices: Record<string, { price: number; unit: string }> = {
-    // Proteins
-    'chicken': { price: 3.99, unit: 'lb' },
-    'beef': { price: 5.99, unit: 'lb' },
-    'pork': { price: 4.49, unit: 'lb' },
-    'fish': { price: 8.99, unit: 'lb' },
-    'salmon': { price: 12.99, unit: 'lb' },
-    'eggs': { price: 0.25, unit: 'each' },
-    'milk': { price: 3.99, unit: 'gallon' },
-    'cheese': { price: 4.99, unit: 'lb' },
-    'yogurt': { price: 0.69, unit: 'cup' },
-    'butter': { price: 4.99, unit: 'lb' },
-    
-    // Produce
-    'onion': { price: 1.29, unit: 'lb' },
-    'garlic': { price: 0.79, unit: 'head' },
-    'tomato': { price: 2.49, unit: 'lb' },
-    'lettuce': { price: 1.99, unit: 'head' },
-    'carrot': { price: 1.49, unit: 'lb' },
-    'potato': { price: 0.89, unit: 'lb' },
-    'apple': { price: 2.49, unit: 'lb' },
-    'banana': { price: 0.79, unit: 'lb' },
-    'lemon': { price: 1.29, unit: 'each' },
-    'lime': { price: 0.89, unit: 'each' },
-    'broccoli': { price: 2.99, unit: 'head' },
-    'spinach': { price: 3.99, unit: 'bag' },
-    'bell pepper': { price: 1.99, unit: 'each' },
-    'cucumber': { price: 1.49, unit: 'each' },
-    
-    // Pantry staples
-    'flour': { price: 3.49, unit: 'lb' },
-    'sugar': { price: 2.49, unit: 'lb' },
-    'rice': { price: 2.99, unit: 'lb' },
-    'pasta': { price: 1.49, unit: 'lb' },
-    'bread': { price: 3.49, unit: 'loaf' },
-    'oil': { price: 5.99, unit: 'bottle' },
-    'salt': { price: 1.49, unit: 'container' },
-    'pepper': { price: 2.99, unit: 'container' },
-    
-    // Spices & seasonings
-    'cumin': { price: 4.99, unit: 'oz' },
-    'paprika': { price: 3.99, unit: 'oz' },
-    'oregano': { price: 3.49, unit: 'oz' },
-    'thyme': { price: 3.99, unit: 'oz' },
-    'basil': { price: 3.49, unit: 'oz' },
-    'cinnamon': { price: 4.49, unit: 'oz' },
-    'nutmeg': { price: 5.99, unit: 'oz' },
-  };
-
   const getIngredientKey = (ingredient: string): string => {
     return ingredient.toLowerCase().split(' ')[0]; // Get first word
   };
@@ -268,57 +218,38 @@ export const GroceryCostEstimator: React.FC<GroceryCostEstimatorProps> = ({ meal
         ingredient: parsed.name,
         quantity: parsed.quantity,
         unit: realTimeData.unit,
-        estimatedCost: realTimeData.minPrice * parsed.quantity,
+        estimatedCost: priceFor(parsed.quantity, parsed.unit, realTimeData.minPrice, realTimeData.unit),
         source: 'known'
       };
     }
 
-    // Priority 3: Check default prices (curated list)
-    if (defaultPrices[key]) {
-      const priceInfo = defaultPrices[key];
-      return {
-        ingredient: parsed.name,
-        quantity: parsed.quantity,
-        unit: priceInfo.unit,
-        estimatedCost: priceInfo.price * parsed.quantity,
-        source: 'estimated'
-      };
-    }
-
-    // Priority 4: Try to match partial ingredient names
-    const partialMatch = Object.keys(defaultPrices).find(
-      k => normalizedKey.includes(k) || k.includes(normalizedKey)
-    );
-    if (partialMatch) {
-      const priceInfo = defaultPrices[partialMatch];
-      return {
-        ingredient: parsed.name,
-        quantity: parsed.quantity,
-        unit: priceInfo.unit,
-        estimatedCost: priceInfo.price * parsed.quantity,
-        source: 'estimated'
-      };
-    }
-
-    // Final fallback: Generic estimate based on common ingredient types
-    let estimatePrice = 2.00;
-    if (normalizedKey.includes('meat') || normalizedKey.includes('chicken') || normalizedKey.includes('beef')) {
-      estimatePrice = 5.00;
-    } else if (normalizedKey.includes('fish') || normalizedKey.includes('salmon')) {
-      estimatePrice = 9.00;
-    } else if (normalizedKey.includes('dairy') || normalizedKey.includes('milk') || normalizedKey.includes('cheese')) {
-      estimatePrice = 4.00;
-    } else if (normalizedKey.includes('vegetable') || normalizedKey.includes('fruit')) {
-      estimatePrice = 2.00;
-    }
-
+    // Priority 3: Curated price database (groceryPriceService's canonical price list,
+    // with plural-stripping and a generic per-unit fallback baked in).
+    const priceInfo = groceryPriceService.getDefaultPrice(parsed.name);
     return {
       ingredient: parsed.name,
       quantity: parsed.quantity,
-      unit: parsed.unit,
-      estimatedCost: estimatePrice * parsed.quantity,
+      unit: priceInfo.unit,
+      estimatedCost: priceFor(parsed.quantity, parsed.unit, priceInfo.price, priceInfo.unit),
       source: 'estimated'
     };
+  };
+
+  // Price is quoted per `priceUnit` (e.g. $/lb) but the recipe quantity may be in a
+  // different unit (e.g. grams, oz, count) — convert before multiplying, or a per-lb
+  // price applied to a gram quantity inflates the estimate ~450x (F: $5000 ground beef).
+  const priceFor = (qty: number, qtyUnit: string, pricePerUnit: number, priceUnit: string): number => {
+    if (qtyUnit.toLowerCase() === priceUnit.toLowerCase()) {
+      return pricePerUnit * qty;
+    }
+    const converted = convertQuantity(qty, qtyUnit, priceUnit);
+    if (converted !== null) {
+      return pricePerUnit * converted;
+    }
+    // Units aren't convertible (e.g. count vs. weight) — multiplying directly would be
+    // wrong, but so would silently dropping the item. Treat qty as already being in
+    // priceUnit terms (the pre-existing behavior) rather than guessing further.
+    return pricePerUnit * qty;
   };
 
   const costBreakdown = useMemo(() => {
@@ -424,7 +355,7 @@ export const GroceryCostEstimator: React.FC<GroceryCostEstimatorProps> = ({ meal
                 variant="inline"
                 feature="grocery cost estimates"
                 message={`first ${freeItemLimit} shown — upgrade for full estimate`}
-                onUpgrade={() => setActiveTab(Tab.SETTINGS)}
+                onUpgrade={() => { setActiveSettingsCategory('subscription'); setActiveTab(Tab.SETTINGS); }}
                 className="ml-1 text-amber-600 hover:text-amber-700 underline text-xs"
               />
             )}

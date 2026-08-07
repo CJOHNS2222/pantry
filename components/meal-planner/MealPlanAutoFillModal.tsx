@@ -25,7 +25,7 @@ export const MealPlanAutoFillModal: React.FC<MealPlanAutoFillModalProps> = ({
   onAutoFill,
   canUseTwoWeekPlanning,
 }) => {
-  const { addToast, setActiveTab } = useAppActions();
+  const { addToast, setActiveTab, setActiveSettingsCategory } = useAppActions();
   const [preferences, setPreferences] = useState<AutoFillPreferences>({
     mealTypes: {
       breakfast: false,
@@ -125,6 +125,7 @@ export const MealPlanAutoFillModal: React.FC<MealPlanAutoFillModalProps> = ({
                       if (isDisabled) {
                         addToast('Planning beyond 7 days requires Premium.', 'info', 5000, 'Upgrade', () => {
                           onClose();
+                          setActiveSettingsCategory('subscription');
                           setActiveTab(Tab.SETTINGS);
                         });
                         return;

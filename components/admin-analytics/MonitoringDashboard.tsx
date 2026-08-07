@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { AlertTriangle, Database, TrendingUp, Clock, Activity } from 'lucide-react';
-import DatabaseMonitoringService from '../../services/databaseMonitoringService';
+import DatabaseMonitoringService, { DatabaseMetrics } from '../../services/databaseMonitoringService';
 import { User } from '../../types';
 
 interface MonitoringDashboardProps {
@@ -8,9 +8,10 @@ interface MonitoringDashboardProps {
   compact?: boolean;
 }
 
+type DisplayMetrics = DatabaseMetrics & { sessionDuration: number; readsPerMinute: number; writesPerMinute: number };
+
 export const MonitoringDashboard: React.FC<MonitoringDashboardProps> = ({ user: _user, compact = false }) => {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const [metrics, setMetrics] = useState<any>(null);
+  const [metrics, setMetrics] = useState<DisplayMetrics | null>(null);
   const [alerts, setAlerts] = useState<string[]>([]);
 
   useEffect(() => {

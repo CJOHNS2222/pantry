@@ -3,6 +3,7 @@ import { ChevronRight, Clock } from 'lucide-react';
 import { DisplayedPantryItem } from './usePantryFilterSort';
 import { formatItemQuantity, getExpirationColor, getPreferredItemDisplayImage } from '../../utils/appUtils';
 import { ProgressiveImage } from '../ui/ProgressiveImage';
+import { PantryRowActionHandlers } from './usePantryQuickConsume';
 
 import HapticService from '../../services/hapticService';
 
@@ -12,8 +13,7 @@ interface PantryItemRowProps {
   isSelected: boolean;
   onToggleSelect: (index: number) => void;
   onSelectItem: (index: number) => void;
-  /* eslint-disable-next-line @typescript-eslint/no-explicit-any */
-  getRowActionHandlers: (item: DisplayedPantryItem) => any;
+  getRowActionHandlers: (item: DisplayedPantryItem) => PantryRowActionHandlers;
   /** Returns true if a long-press/swipe already consumed this gesture. Optional
    * so tile/grid callers that don't wire gestures keep working unchanged. */
   consumeGestureSuppression?: () => boolean;

@@ -1,6 +1,6 @@
 import remoteConfig from './remoteConfigService';
 
-type ActionType = 'delete_item' | 'bulk_edit' | 'update_item';
+type ActionType = 'delete_item' | 'bulk_edit' | 'update_item' | 'bulk_delete';
 
 export interface UndoAction {
   id: string;
@@ -155,7 +155,7 @@ class UndoService {
 
   async undoAction(action: UndoAction): Promise<{ type: 'restore_item' | 'revert_edit'; data: unknown } | null> {
     // Return the undo operation details
-    if (action.type === 'delete_item') {
+    if (action.type === 'delete_item' || action.type === 'bulk_delete') {
       return { type: 'restore_item', data: action.data };
     } else if (action.type === 'bulk_edit') {
       // For bulk edit, data would contain the previous states

@@ -7,7 +7,7 @@ import { SyncIndicator } from '../ui/SyncIndicator';
 import { OnlineIndicator } from '../ui/OnlineIndicator';
 import { SyncStatus } from '../../hooks/useOfflineStatus';
 import useUserNotifications from '../../hooks/useUserNotifications';
-import { markAllNotificationsRead, markNotificationRead, deleteNotification, NotificationCacheItem } from '../../services/notificationsService';
+import { markAllNotificationsRead, markNotificationRead, deleteNotification, NotificationCacheItem } from '../../services/notificationCacheService';
 import { AppSettings } from '../../hooks/useSettings';
 import { UndoAction } from '../../services/undoService';
 

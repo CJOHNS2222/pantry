@@ -4,7 +4,6 @@ import { searchRecipes } from '../../services/geminiService';
 import { setUserGeminiOptIn } from '../../services/featureFlags';
 import { getCachedRecipesCache, submitRecipeForReview, cacheGeminiSearchRecipes } from '../../services/recipeService';
 import { RecipeSearchResult, LoadingState, RecipeRating, StructuredRecipe, PantryItem, SavedRecipe, User, Household, RecipeSearchParams, RecipeSuggestion } from '../../types';
-import { PremiumFeature } from '../settings/PremiumFeature';
 import { log } from '../../services/logService';
 import AnalyticsService from '../../services/analyticsService';
 import { UsageService } from '../../services/usageService';
@@ -26,6 +25,7 @@ import { RecipeFinderCard, RecipeFinderTile } from '../recipe-finder/RecipeFinde
 import { RecipeFinderTabs } from '../recipe-finder/RecipeFinderTabs';
 import { RecipeFinderModalSection } from '../recipe-finder/RecipeFinderModalSection';
 import { Tab } from '../../types/app';
+import { useAppActions } from '../../contexts/AppActionsContext';
 import SmartRecommendations from '../pantry/SmartRecommendations';
 import { RecipeRecommendations } from './RecipeRecommendations';
 import { FALLBACK_CSV_RECIPES } from '../../data/fallbackRecipes';
@@ -70,6 +70,7 @@ interface RecipeFinderProps {
 const STAPLES = ['salt', 'pepper', 'oil', 'water', 'flour', 'sugar', 'butter', 'vinegar', 'baking powder', 'baking soda', 'spices', 'seasoning', 'soy sauce', 'cornstarch', 'yeast'];
 
 const RecipeFinderComponent: React.FC<RecipeFinderProps> = ({ onAddToPlan, onSaveRecipe, onDeleteRecipe, onMarkAsMade, inventory, ratings = [], onRate, savedRecipes, user, setActiveTab, persistedResult, setPersistedResult, initialSearchQuery, addToast, recipeSaveLimitExceeded = false, mealPlanLimitExceeded = false, isLoadingSavedRecipes = false, household, recipeSuggestions, onDeleteItem, setInitialSearchQuery }) => {
+    const { setActiveSettingsCategory } = useAppActions();
     const intl = useIntl();
     // Pre-computed inventory lookup data for fast feasibility calculations
     const inventoryLookup = useMemo(() => {
@@ -588,7 +589,7 @@ const RecipeFinderComponent: React.FC<RecipeFinderProps> = ({ onAddToPlan, onSav
                             'error',
                             6000,
                             'Upgrade Now',
-                            () => setActiveTab(Tab.SETTINGS)
+                            () => { setActiveSettingsCategory('subscription'); setActiveTab(Tab.SETTINGS); }
                         );
                     }
                     return;
@@ -1052,14 +1053,6 @@ const RecipeFinderComponent: React.FC<RecipeFinderProps> = ({ onAddToPlan, onSav
       </div>
 
       {activeView === 'saved' ? (
-          <PremiumFeature
-            feature="savedRecipes"
-            user={user}
-            limit={10}
-            currentCount={savedRecipes.length}
-            fallbackMessage="Upgrade to Premium to save more than 10 recipes"
-            onUpgrade={() => setActiveTab(Tab.SETTINGS)}
-          >
             <RecipeFinderSavedView
               showImportModal={showImportModal}
               setShowImportModal={setShowImportModal}
@@ -1109,7 +1102,6 @@ const RecipeFinderComponent: React.FC<RecipeFinderProps> = ({ onAddToPlan, onSav
                 setShowRecipeModal(true);
               }}
             />
-          </PremiumFeature>
       ) : (
         <>
           <SmartRecommendations

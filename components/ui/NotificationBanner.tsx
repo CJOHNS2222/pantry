@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Bell, X, Clock, Settings } from 'lucide-react';
-import { AppNotification } from '../../services/notificationService';
+import { AppNotification } from '../../services/notificationBuilderService';
 
 interface NotificationBannerProps {
   notification: AppNotification;

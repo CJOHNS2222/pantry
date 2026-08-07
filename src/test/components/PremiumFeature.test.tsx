@@ -15,6 +15,12 @@ vi.mock('../../../contexts/AppContext', () => ({
   useApp: () => ({ setActiveTab: mockSetActiveTab }),
 }));
 
+// Mock AppActionsContext to satisfy useAppActions() inside PremiumFeature
+const mockSetActiveSettingsCategory = vi.fn();
+vi.mock('../../../contexts/AppActionsContext', () => ({
+  useAppActions: () => ({ setActiveSettingsCategory: mockSetActiveSettingsCategory }),
+}));
+
 describe('PremiumFeature', () => {
   afterEach(() => {
     cleanup();

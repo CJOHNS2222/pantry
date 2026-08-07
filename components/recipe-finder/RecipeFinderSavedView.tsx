@@ -15,6 +15,7 @@ import {
 } from 'lucide-react';
 import { SavedRecipe, StructuredRecipe } from '../../types';
 import { Tab } from '../../types/app';
+import { useAppActions } from '../../contexts/AppActionsContext';
 import RecipeImportModal from './RecipeImportModal';
 import { RecipeCardSkeleton } from '../ui/SkeletonLoader';
 import { RecipeExportModal } from './RecipeExportModal';
@@ -50,6 +51,7 @@ export const RecipeFinderSavedView: React.FC<RecipeFinderSavedViewProps> = ({
   onExportRecipes: _onExportRecipes,
   onAddManualRecipe,
 }) => {
+  const { setActiveSettingsCategory } = useAppActions();
   const intl = useIntl();
   const confirm = useConfirm();
   const toast = useToast();
@@ -162,7 +164,7 @@ export const RecipeFinderSavedView: React.FC<RecipeFinderSavedViewProps> = ({
           className="mb-3"
           feature="saved recipes"
           message={`Save limit reached (${savedRecipes.length} saved) - upgrade to save more`}
-          onUpgrade={() => setActiveTab(Tab.SETTINGS)}
+          onUpgrade={() => { setActiveSettingsCategory('subscription'); setActiveTab(Tab.SETTINGS); }}
         />
       )}
 

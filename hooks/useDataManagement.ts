@@ -4,7 +4,7 @@ import { User, PantryItem, StructuredRecipe, Settings } from '../types';
 import { deductIngredientAmount, shouldShowExpiryAlert } from '../utils/appUtils';
 import { HouseholdPreferenceService } from '../services/householdPreferenceService';
 import { InventoryCacheService } from '../services/inventoryCacheService';
-import { pruneNotificationsForDeletedItems } from '../services/notificationsService';
+import { pruneNotificationsForDeletedItems } from '../services/notificationCacheService';
 import FoodWasteAnalyticsService from '../services/foodWasteAnalyticsService';
 import HapticService from '../services/hapticService';
 import { setRemoteInventoryUpdate, setRemoteShoppingListUpdate, setRemoteMealPlanUpdate, setRemoteSavedRecipesUpdate } from '../services/syncStateService';

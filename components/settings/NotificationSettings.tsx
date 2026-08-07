@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Bell, Clock, Settings as SettingsIcon } from 'lucide-react';
-import { NotificationService, NotificationSettings } from '../../services/notificationService';
+import { NotificationService, NotificationSettings } from '../../services/notificationBuilderService';
 import { User } from '../../types';
 import { Capacitor } from '@capacitor/core';
 import { PushNotifications } from '@capacitor/push-notifications';

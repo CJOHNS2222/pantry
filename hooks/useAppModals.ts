@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from 'react';
 import { User, PantryItem, StructuredRecipe, SavedRecipe, Household, DayPlan } from '../types';
-import { AppNotification } from '../services/notificationService';
+import { AppNotification } from '../services/notificationBuilderService';
 import { useAndroidBack } from './useAndroidBack';
 import { getUnlockedBadges } from '../utils/achievementUtils';
 import { useCelebrationFireworks } from './useCelebrationFireworks';

@@ -21,7 +21,7 @@ import { useOfflineStatus } from './hooks/useOfflineStatus';
 import AnalyticsService from './services/analyticsService';
 import { SubscriptionProvider } from './hooks/useSubscription';
 import { NotificationBanner } from './components/ui/NotificationBanner';
-import { NotificationSettings } from './services/notificationService';
+import { NotificationSettings } from './services/notificationBuilderService';
 import { setAppContext } from './services/sentryService';
 import { AppProvider } from './contexts/AppContext';
 import { AppActionsProvider } from './contexts/AppActionsContext';

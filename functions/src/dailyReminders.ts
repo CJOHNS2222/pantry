@@ -22,7 +22,7 @@ const USER_PAGE_SIZE = 500;
  * and the expiration lead-time preference).
  */
 
-// ─── Notification settings (mirrors services/notificationService.ts on the client) ──
+// ─── Notification settings (mirrors services/notificationBuilderService.ts on the client) ──
 
 type ExpirySetting = 'never' | 'urgent' | 'day_before' | 'week_before';
 
@@ -122,7 +122,7 @@ function computeExpirationDate(item: ParsedInventoryItem): string {
   return item.expirationDate;
 }
 
-// ─── Notification append (mirrors services/notificationsService.ts's dedupe/prune) ──
+// ─── Notification append (mirrors services/notificationCacheService.ts's dedupe/prune) ──
 
 interface NotificationPayload {
   id: string;
@@ -208,7 +208,7 @@ async function getExpiringItems(
     .map(([id, arr]) => parseInventoryItem(id, arr as string[]));
 
   // 'urgent' and 'day_before' both mean "only things expiring today/tomorrow" (matches
-  // the client's shouldShowNotification gating in services/notificationService.ts).
+  // the client's shouldShowNotification gating in services/notificationBuilderService.ts).
   const maxDays = expirySetting === 'week_before' ? 7 : 1;
 
   return items

@@ -25,7 +25,7 @@ import { db } from '../firebaseConfig';
 import AnalyticsService from './analyticsService';
 import { reportDatabaseError, reportHeavyWritePattern, reportPerformanceIssue } from './sentryService';
 
-interface DatabaseMetrics {
+export interface DatabaseMetrics {
   reads: number;
   writes: number;
   deletes: number;

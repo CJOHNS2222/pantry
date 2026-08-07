@@ -271,7 +271,7 @@ describe('RecipeService', () => {
   });
 
   describe('searchRecipesInFirestore', () => {
-    it('searches recipes by title', async () => {
+    it('searches recipes by title against the merged recipe caches', async () => {
       const mockRecipes: SavedRecipe[] = [
         {
           id: 'recipe1',
@@ -283,63 +283,28 @@ describe('RecipeService', () => {
         },
       ];
 
-      const mockQuerySnapshot = {
-        docs: mockRecipes.map(recipe => ({
-          id: recipe.id,
-          data: () => recipe,
-          exists: true,
-          metadata: {
-            fromCache: false,
-            hasPendingWrites: false,
-            isEqual: vi.fn(() => false)
-          },
-          get: vi.fn(),
-          toJSON: vi.fn(() => ({})),
-          ref: {} as any
-        })),
-        forEach: vi.fn((callback) => {
-          mockRecipes.forEach(recipe => callback({
-            id: recipe.id,
-            data: () => recipe,
-            exists: true,
-            metadata: {
-              fromCache: false,
-              hasPendingWrites: false,
-              isEqual: vi.fn(() => false)
-            },
-            get: vi.fn(),
-            toJSON: vi.fn(() => ({})),
-            ref: {} as any
-          }));
-        }),
-        size: mockRecipes.length,
-        empty: false,
-        metadata: {
-          fromCache: false,
-          hasPendingWrites: false,
-          isEqual: vi.fn(() => false)
-        },
-        query: {} as any,
-        docChanges: vi.fn(() => []),
-        toJSON: vi.fn(() => ({}))
-      };
-
-      vi.mocked(DatabaseMonitoringService.getDocs).mockResolvedValueOnce(mockQuerySnapshot);
-      // The search path will then batch-get the full recipe docs; mock those getDoc results
-      vi.mocked(DatabaseMonitoringService.getDoc).mockResolvedValueOnce({
-        exists: vi.fn(() => true),
-        data: vi.fn(() => mockRecipes[0]),
-        id: 'recipe1'
-      } as any);
+      // getAllCachedRecipes() reads recipe_caches/popular_recipes (via getDoc),
+      // then recipe_caches/recipes_cache_1 and _2 (also via getDoc, empty).
+      vi.mocked(DatabaseMonitoringService.getDoc)
+        .mockResolvedValueOnce({
+          exists: vi.fn(() => true),
+          data: vi.fn(() => ({ recipes: mockRecipes })),
+          id: 'popular-recipes-cache'
+        } as any)
+        .mockResolvedValue({
+          exists: vi.fn(() => false),
+          data: vi.fn(() => ({})),
+          id: 'empty-chunk'
+        } as any);
 
       const result = await searchRecipesInFirestore('chicken');
 
-      expect(DatabaseMonitoringService.getDocs).toHaveBeenCalled();
+      expect(DatabaseMonitoringService.getDocs).not.toHaveBeenCalled();
       expect(result).toEqual(mockRecipes);
     });
 
     it('handles search errors', async () => {
-      vi.mocked(DatabaseMonitoringService.getDocs).mockRejectedValueOnce(new Error('Search failed'));
+      vi.mocked(DatabaseMonitoringService.getDoc).mockRejectedValue(new Error('Search failed'));
 
       const result = await searchRecipesInFirestore('test');
 

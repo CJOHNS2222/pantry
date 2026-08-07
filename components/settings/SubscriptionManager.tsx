@@ -37,7 +37,8 @@ const getPlanProductId = (planId: string, period: 'monthly' | 'yearly'): Product
 };
 
 export const SubscriptionManager: React.FC<SubscriptionManagerProps> = ({ user }) => {
-  const { subscription, isPremium, isActive } = useSubscription(user);
+  const { subscription, isPremium, isActive, effectiveTier } = useSubscription(user);
+  const isPastDue = subscription?.status === 'past_due';
   const { addToast } = useAppActions();
   const [showPlans, setShowPlans] = useState(false);
   const [usageLimits, setUsageLimits] = useState<UsageLimits | null>(null);
@@ -81,14 +82,14 @@ export const SubscriptionManager: React.FC<SubscriptionManagerProps> = ({ user }
 
     // Track subscription funnel - viewing pricing
     AnalyticsService.trackSubscriptionFunnel('view_pricing', {
-      current_tier: subscription?.tier || 'free',
+      current_tier: effectiveTier,
       is_active: isActive
     });
-  }, [user, subscription?.tier, isActive]);
+  }, [user, effectiveTier, isActive]);
 
   const handleUpgrade = async (plan: { id: string; name?: string; price?: string }) => {
     const planTierIndex = TIER_ORDER[plan.id] || 0;
-    const currentTierIndex = TIER_ORDER[subscription?.tier || 'free'] || 0;
+    const currentTierIndex = TIER_ORDER[effectiveTier] || 0;
 
     // Any downgrade (including to the Free plan or to a lower paid tier)
     // is redirected to Google Play Store subscriptions settings for safety.
@@ -110,7 +111,7 @@ export const SubscriptionManager: React.FC<SubscriptionManagerProps> = ({ user }
     AnalyticsService.trackSubscriptionFunnel('upgrade_intent', {
       plan_name: plan.name,
       plan_price: plan.price,
-      current_tier: subscription?.tier || 'free',
+      current_tier: effectiveTier,
     });
 
     setPurchaseError(null);
@@ -212,7 +213,7 @@ export const SubscriptionManager: React.FC<SubscriptionManagerProps> = ({ user }
     }
   ];
 
-  const currentPlan = plans.find(p => p.id === subscription?.tier) || plans[0];
+  const currentPlan = plans.find(p => p.id === effectiveTier) || plans[0];
 
   return (
     <div className="space-y-6">
@@ -231,17 +232,28 @@ export const SubscriptionManager: React.FC<SubscriptionManagerProps> = ({ user }
           </div>
           <div className="text-right">
             <p className="text-2xl font-bold text-gray-900 dark:text-white">
-              {subscription?.product_id
+              {isActive && subscription?.product_id
                 ? (livePrices[subscription.product_id] || (subscription.product_id.includes('yearly') ? (subscription.product_id.includes('premium') ? '$29.99' : '$59.99') : (subscription.product_id.includes('premium') ? '$4.99' : '$9.99')))
-                : (subscription?.tier === 'family' ? '$9.99' : subscription?.tier === 'premium' ? '$4.99' : '$0')}
+                : (effectiveTier === 'family' ? '$9.99' : effectiveTier === 'premium' ? '$4.99' : '$0')}
             </p>
             <p className="text-sm text-gray-600 dark:text-gray-400">
-              {subscription?.product_id
+              {isActive && subscription?.product_id
                 ? (subscription.product_id.includes('yearly') ? 'per year' : 'per month')
-                : (subscription?.tier === 'premium' || subscription?.tier === 'family' ? 'per month' : 'forever')}
+                : (effectiveTier === 'premium' || effectiveTier === 'family' ? 'per month' : 'forever')}
             </p>
           </div>
         </div>
+
+        {isPastDue && (
+          <div className="bg-gradient-to-r from-amber-50 to-orange-50 dark:from-amber-900/20 dark:to-orange-900/20 border-2 border-amber-300 dark:border-amber-700 rounded-lg p-4 mb-4">
+            <p className="text-sm font-bold text-amber-800 dark:text-amber-200">
+              Payment issue with your {subscription?.tier === 'family' ? 'Family' : 'Premium'} plan
+            </p>
+            <p className="text-xs text-amber-700 dark:text-amber-300 mt-1">
+              We couldn't process your last payment, so premium features are paused. Update your payment method in Google Play to keep your plan, or choose a new plan below.
+            </p>
+          </div>
+        )}
 
         {subscription?.status === 'trialing' && (
           <div className="bg-gradient-to-r from-green-50 to-emerald-50 dark:from-green-900/20 dark:to-emerald-900/20 border-2 border-green-300 dark:border-green-700 rounded-lg p-4 mb-4">
@@ -338,10 +350,10 @@ export const SubscriptionManager: React.FC<SubscriptionManagerProps> = ({ user }
           <div className="grid gap-4 md:grid-cols-3">
             {plans.map((plan) => {
               const targetProductId = getPlanProductId(plan.id, billingPeriod);
-              const isCurrentProduct = plan.id === (subscription?.tier || 'free');
+              const isCurrentProduct = plan.id === effectiveTier;
 
               const planTierIndex = TIER_ORDER[plan.id] || 0;
-              const currentTierIndex = TIER_ORDER[subscription?.tier || 'free'] || 0;
+              const currentTierIndex = TIER_ORDER[effectiveTier] || 0;
               const isDowngrade = planTierIndex < currentTierIndex;
 
               return (

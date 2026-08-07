@@ -6,6 +6,7 @@ import { Capacitor, registerPlugin } from '@capacitor/core';
 import { StructuredRecipe } from '../../types';
 import { log } from '../../services/logService';
 import HapticService from '../../services/hapticService';
+import { getWebSpeechRecognitionCtor } from '../../types/webSpeech';
 
 interface DocumentWithPrefixes extends Document {
   webkitExitFullscreen?: () => void;
@@ -154,17 +155,13 @@ export const CookingMode: React.FC<CookingModeProps> = ({ recipes = [], initialI
         await SpeechRecognition.start({ language: 'en-US', partialResults: true, popup: false });
         setIsListening(true);
       } else {
-        /* eslint-disable-next-line @typescript-eslint/no-explicit-any */
-        type WebSpeechCtor = new() => { continuous: boolean; interimResults: boolean; lang: string; onresult: ((e: any) => void) | null; onend: (() => void) | null; start(): void; stop(): void; };
-        /* eslint-disable-next-line @typescript-eslint/no-explicit-any */
-        const WebSpeech = ((window as any).SpeechRecognition || (window as any).webkitSpeechRecognition) as WebSpeechCtor | undefined;
+        const WebSpeech = getWebSpeechRecognitionCtor();
         if (WebSpeech) {
           const recog = new WebSpeech();
           recog.continuous = true;
           recog.interimResults = false;
           recog.lang = 'en-US';
-          /* eslint-disable-next-line @typescript-eslint/no-explicit-any */
-          recog.onresult = (event: any) => {
+          recog.onresult = (event) => {
             const last = event.results[event.results.length - 1];
             const transcript = (last?.[0]?.transcript || '').toLowerCase().trim();
             if (transcript.includes('next') || transcript.includes('forward')) {

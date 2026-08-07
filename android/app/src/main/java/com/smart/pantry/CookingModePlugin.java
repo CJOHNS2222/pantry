@@ -7,6 +7,7 @@ import android.view.View;
 import android.view.Window;
 import android.view.WindowInsets;
 import android.view.WindowInsetsController;
+import androidx.core.view.WindowCompat;
 import com.getcapacitor.Plugin;
 import com.getcapacitor.PluginCall;
 import com.getcapacitor.PluginMethod;
@@ -32,6 +33,13 @@ public class CookingModePlugin extends Plugin {
 
                     // 2. Hide status bar (notification bar) and navigation buttons
                     Window window = activity.getWindow();
+
+                    // targetSdk 35+ forces edge-to-edge; the WebView's touchable region can
+                    // become stale relative to its visual bounds across the orientation change
+                    // below unless we explicitly re-run the inset/layout pass (hiding bars via
+                    // WindowInsetsController alone no longer triggers this reliably).
+                    WindowCompat.setDecorFitsSystemWindows(window, false);
+
                     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
                         WindowInsetsController controller = window.getInsetsController();
                         if (controller != null) {
@@ -49,6 +57,15 @@ public class CookingModePlugin extends Plugin {
                             | View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY
                         );
                     }
+
+                    final View content = window.getDecorView();
+                    content.post(new Runnable() {
+                        @Override
+                        public void run() {
+                            content.requestLayout();
+                        }
+                    });
+
                     call.resolve();
                 } catch (Exception e) {
                     call.reject("Failed to enable cooking mode: " + e.getMessage(), e);
@@ -74,6 +91,8 @@ public class CookingModePlugin extends Plugin {
 
                     // 2. Show status bar and navigation buttons
                     Window window = activity.getWindow();
+                    WindowCompat.setDecorFitsSystemWindows(window, true);
+
                     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
                         WindowInsetsController controller = window.getInsetsController();
                         if (controller != null) {
@@ -85,6 +104,15 @@ public class CookingModePlugin extends Plugin {
                             View.SYSTEM_UI_FLAG_LAYOUT_STABLE
                         );
                     }
+
+                    final View content = window.getDecorView();
+                    content.post(new Runnable() {
+                        @Override
+                        public void run() {
+                            content.requestLayout();
+                        }
+                    });
+
                     call.resolve();
                 } catch (Exception e) {
                     call.reject("Failed to disable cooking mode: " + e.getMessage(), e);

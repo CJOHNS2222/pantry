@@ -827,7 +827,7 @@ class GroceryPriceService {
   }
 
   // Get default price for an ingredient with plural fallback
-  private getDefaultPrice(ingredient: string): { price: number; unit: string } {
+  getDefaultPrice(ingredient: string): { price: number; unit: string } {
     const key = this.normalizeIngredientName(ingredient);
     if (this.defaultPrices[key]) return this.defaultPrices[key];
 

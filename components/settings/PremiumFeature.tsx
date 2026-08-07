@@ -1,6 +1,7 @@
 import React from 'react';
 import { useSubscription } from '../../hooks/useSubscription';
 import { useApp } from '../../contexts/AppContext';
+import { useAppActions } from '../../contexts/AppActionsContext';
 import { Tab } from '../../types/app';
 import { User } from '../../types';
 import { PaywallPrompt } from '../ui/PaywallPrompt';
@@ -30,6 +31,7 @@ export const PremiumFeature: React.FC<PremiumFeatureProps> = ({
 }) => {
   const { isPremium, isActive, loading } = useSubscription(user);
   const { setActiveTab } = useApp();
+  const { setActiveSettingsCategory } = useAppActions();
 
   if (loading) {
     return <div className="animate-pulse bg-gray-200 h-8 rounded"></div>;
@@ -73,7 +75,7 @@ export const PremiumFeature: React.FC<PremiumFeatureProps> = ({
         message={fallbackMessage || `You've reached the ${limit} ${feature} limit. Join thousands of home chefs who upgraded for unlimited access!`}
         perks={['✨ Premium users save 2+ hours per week on meal planning']}
         ctaLabel="Upgrade Now - Starting at $4.99/mo"
-        onUpgrade={onUpgrade || (() => setActiveTab(Tab.SETTINGS))}
+        onUpgrade={onUpgrade || (() => { setActiveSettingsCategory('subscription'); setActiveTab(Tab.SETTINGS); })}
       >
         {children}
       </PaywallPrompt>
@@ -96,7 +98,7 @@ export const PremiumFeature: React.FC<PremiumFeatureProps> = ({
       message={`Unlock ${feature} and discover recipes tailored to your pantry. Join 10,000+ home chefs who save time and reduce food waste!`}
       perks={['🎯 Find recipes using ingredients you already have']}
       ctaLabel="Try Premium Free for 7 Days"
-      onUpgrade={onUpgrade || (() => setActiveTab(Tab.SETTINGS))}
+      onUpgrade={onUpgrade || (() => { setActiveSettingsCategory('subscription'); setActiveTab(Tab.SETTINGS); })}
     >
       {children}
     </PaywallPrompt>
@@ -120,6 +122,7 @@ export const FeatureLimit: React.FC<FeatureLimitProps> = ({
 }) => {
   const { isPremium, isActive } = useSubscription(user);
   const { setActiveTab } = useApp();
+  const { setActiveSettingsCategory } = useAppActions();
 
   if (isPremium && isActive) {
     return <>{children}</>;
@@ -133,7 +136,7 @@ export const FeatureLimit: React.FC<FeatureLimitProps> = ({
         currentCount={current}
         message={`You've reached the free limit of ${limit} ${feature}`}
         ctaLabel="Upgrade for Unlimited"
-        onUpgrade={() => setActiveTab(Tab.SETTINGS)}
+        onUpgrade={() => { setActiveSettingsCategory('subscription'); setActiveTab(Tab.SETTINGS); }}
       />
     );
   }

@@ -235,14 +235,14 @@ export const getCachedCommunityRatedRecipes = async (): Promise<SavedRecipe[]> =
       return recipes;
     }
 
-    // Fallback to retrieving saved recipes (not ideal but safe)
-    // No community-rated cache found, falling back to saved recipes
-    const fallback = await getSavedRecipes(50);
+    // Fallback to the chunked recipes cache (still 1-2 cheap reads, never a full collection scan)
+    // No community-rated cache found, falling back to recipes_cache chunks
+    const fallback = await getCachedRecipesCache();
     communityRatedRecipesCache = fallback;
     return fallback;
   } catch (err: unknown) {
     log.error('Error fetching community-rated cache', err);
-    return await getSavedRecipes(50);
+    return await getCachedRecipesCache();
   }
 };
 
@@ -877,9 +877,9 @@ export const getCachedPopularRecipes = async (): Promise<SavedRecipe[]> => {
       return uniqueRecipes;
     }
 
-    // If no cached recipes exist, fall back to loading individual recipes
-    // No cached popular recipes found, falling back to individual recipe loading
-    const recipes = await getSavedRecipes(50);
+    // If no cached recipes exist, fall back to the chunked recipes_cache (still cheap, never a full collection scan)
+    // No cached popular recipes found, falling back to recipes_cache chunks
+    const recipes = await getCachedRecipesCache();
     // Remove duplicates even in fallback
     const uniqueFallback = recipes.filter((recipe, index, self) =>
       index === self.findIndex(r => r.title === recipe.title)
@@ -888,9 +888,8 @@ export const getCachedPopularRecipes = async (): Promise<SavedRecipe[]> => {
     return uniqueFallback;
   } catch (err: unknown) {
     log.error("Error fetching cached popular recipes", err);
-    // Fall back to direct loading if caching fails
-    // Falling back to direct recipe loading
-    const recipes = await getSavedRecipes(50);
+    // Fall back to the chunked cache if the primary caching path fails
+    const recipes = await getCachedRecipesCache();
     // Remove duplicates even in fallback
     const uniqueFallback = recipes.filter((recipe, index, self) =>
       index === self.findIndex(r => r.title === recipe.title)
@@ -967,15 +966,43 @@ export const getCachedRecipesCache = async (cachePath: string = 'recipe_caches/r
       }
     }
 
-    const fallback = await getSavedRecipes(50);
-    recipesCacheByPath[cachePath] = fallback;
-    return fallback;
+    // No cache chunks found under either path — do not fall back to a full
+    // `recipes` collection scan (defeats the point of the cache). Callers
+    // treat an empty result as "cache unavailable" and degrade gracefully.
+    log.warn(`No recipes_cache chunks found for ${cachePath}; returning empty rather than scanning the recipes collection`);
+    recipesCacheByPath[cachePath] = [];
+    return [];
   } catch (err: unknown) {
     log.error(`Error fetching cached recipes at ${cachePath}`, err);
-    const fallback = await getSavedRecipes(50);
-    recipesCacheByPath[cachePath] = fallback;
-    return fallback;
+    recipesCacheByPath[cachePath] = [];
+    return [];
   }
+};
+
+let allCachedRecipesMemo: SavedRecipe[] | null = null;
+
+/**
+ * Merge every recipe cache document (`recipe_caches/popular_recipes`,
+ * `recipe_caches/recipes_cache_1`, `recipe_caches/recipes_cache_2`, ...) into one
+ * in-memory, title-deduplicated list. Together these caches mirror the full
+ * `recipes` collection, so any by-title or by-id lookup should match against
+ * this instead of querying `recipes`/`recipe_search_index` directly.
+ */
+export const getAllCachedRecipes = async (): Promise<SavedRecipe[]> => {
+  if (allCachedRecipesMemo) {
+    return allCachedRecipesMemo;
+  }
+  const [popular, chunk1, chunk2] = await Promise.all([
+    getCachedPopularRecipes(),
+    getCachedRecipesCache('recipe_caches/recipes_cache_1'),
+    getCachedRecipesCache('recipe_caches/recipes_cache_2'),
+  ]);
+  const merged = [...popular, ...chunk1, ...chunk2];
+  const deduped = merged.filter((recipe, index, self) =>
+    index === self.findIndex(r => r.title === recipe.title)
+  );
+  allCachedRecipesMemo = deduped;
+  return deduped;
 };
 
 /**
@@ -1063,38 +1090,11 @@ export const rebuildCachedPopularRecipesFromRatings = async (days: number = 30, 
 };
 
 /**
- * Search recipes in Firestore
+ * Search recipes against the in-memory recipe caches (never queries
+ * `recipes`/`recipe_search_index` directly — those collections are the raw
+ * per-document store and must not be scanned at request time; the
+ * `recipe_caches/*` docs already mirror their full contents).
  */
-const SEARCH_INDEX_SCAN_LIMIT = 1000;
-const SEARCH_TOKENS_QUERY_LIMIT = 50;
-const RECIPE_FETCH_CHUNK_SIZE = 25;
-
-/**
- * Fetch full recipe docs for a set of `recipe_search_index` entries, chunked to avoid
- * unbounded parallel request bursts. Shared by the indexed (`searchTokens`/`keywords`
- * array-contains) lookup and the bounded full-scan fallback.
- */
-const fetchRecipesForSearchResults = async (
-  searchResults: Array<{ id: string }>
-): Promise<SavedRecipe[]> => {
-  const fullRecipes: SavedRecipe[] = [];
-  const recipeIds = searchResults.map(result => result.id);
-  for (let start = 0; start < recipeIds.length; start += RECIPE_FETCH_CHUNK_SIZE) {
-    const chunkIds = recipeIds.slice(start, start + RECIPE_FETCH_CHUNK_SIZE);
-    const recipeDocs = await Promise.all(chunkIds.map(id =>
-      DatabaseMonitoringService.getDoc(DatabaseMonitoringService.doc("recipes/" + id))
-    ));
-
-    for (const doc of recipeDocs as FirestoreDocLike[]) {
-      if (doc && (typeof doc.exists === 'function' ? (doc as FirestoreDocLike & { exists(): boolean }).exists() : (doc as FirestoreDocLike & { exists: boolean }).exists)) {
-        const d = doc.data();
-        fullRecipes.push({ id: doc.id, ...(d && typeof d === 'object' ? d as Record<string, unknown> : {}) } as SavedRecipe);
-      }
-    }
-  }
-  return fullRecipes;
-};
-
 export const searchRecipesInFirestore = async (searchTerm: string): Promise<SavedRecipe[]> => {
   const perfTrace = trace(performance, 'search_recipes_firestore');
   perfTrace.start();
@@ -1105,152 +1105,26 @@ export const searchRecipesInFirestore = async (searchTerm: string): Promise<Save
     }
 
     const searchTermLower = searchTerm.toLowerCase();
+    const allRecipes = await getAllCachedRecipes();
 
-    // Use the search index for efficient querying
-    const searchIndexRef = DatabaseMonitoringService.collection("recipe_search_index");
-
-    // Primary lookup: indexed `array-contains` query against the `searchTokens` field
-    // (falls back to the legacy `keywords` field written by
-    // scripts/create-recipe-search-index.js for docs not yet backfilled with
-    // `searchTokens` — see follow-up note below). Bounded by limit(), no full-collection
-    // scan needed when the token matches.
-    // Note: this only matches whole tokens (e.g. "chicken"), not substrings — multi-word
-    // search terms are reduced to their first significant token for the indexed path.
-    const primaryToken = searchTermLower.split(/\s+/).find(w => w.length > 0) ?? searchTermLower;
-    let tokenMatchedDocs: DocumentData[] = [];
-    try {
-      const tokenQuery = DatabaseMonitoringService.query(
-        searchIndexRef,
-        DatabaseMonitoringService.where('searchTokens', 'array-contains', primaryToken),
-        DatabaseMonitoringService.limit(SEARCH_TOKENS_QUERY_LIMIT)
-      );
-      const tokenSnapshot = await DatabaseMonitoringService.getDocs(tokenQuery);
-      tokenMatchedDocs = tokenSnapshot.docs.map((doc: FirestoreDocLike) => doc.data());
-
-      if (tokenMatchedDocs.length === 0) {
-        // `searchTokens` isn't backfilled onto existing docs yet — fall back to the
-        // legacy `keywords` array (populated by the index-creation script) so the
-        // indexed path still works pre-backfill.
-        const keywordsQuery = DatabaseMonitoringService.query(
-          searchIndexRef,
-          DatabaseMonitoringService.where('keywords', 'array-contains', primaryToken),
-          DatabaseMonitoringService.limit(SEARCH_TOKENS_QUERY_LIMIT)
-        );
-        const keywordsSnapshot = await DatabaseMonitoringService.getDocs(keywordsQuery);
-        tokenMatchedDocs = keywordsSnapshot.docs.map((doc: FirestoreDocLike) => doc.data());
-      }
-    } catch (indexedErr: unknown) {
-      // Missing composite index, mocked test env, etc. — fall through to the full scan.
-      log.debug('Indexed recipe search query failed, falling back to full scan', { error: indexedErr });
-    }
-
-    if (tokenMatchedDocs.length > 0) {
-      const fullRecipes = await fetchRecipesForSearchResults(tokenMatchedDocs as Array<{ id: string }>);
-      perfTrace.putMetric('search_term_length', searchTerm.length);
-      perfTrace.putMetric('search_index_size', tokenMatchedDocs.length);
-      perfTrace.putMetric('results_found', fullRecipes.length);
-      perfTrace.putAttribute('search_path', 'indexed');
-      return fullRecipes;
-    }
-
-    // Fallback: bounded full scan + in-memory substring filter (substring matching across
-    // title/description/ingredients/keywords isn't expressible as a Firestore where()
-    // clause). Bound the scan with limit() instead of reading the entire, potentially
-    // unbounded, collection. This avoids dependency on Firestore query builders which
-    // may be mocked in tests.
-    const indexQuery = DatabaseMonitoringService.query(
-      searchIndexRef,
-      DatabaseMonitoringService.limit(SEARCH_INDEX_SCAN_LIMIT)
-    );
-    const querySnapshot = await DatabaseMonitoringService.getDocs(indexQuery);
-
-    // Filter in memory for more flexible search (could be optimized further with Algolia)
-    const searchResults = [];
-    for (const doc of querySnapshot.docs) {
-      const searchEntry = doc.data() as DocumentData | Record<string, unknown>;
-
-      // Check if search term matches title, description, ingredients, or keywords
-      const matches =
-        searchEntry.title?.toLowerCase().includes(searchTermLower) ||
-        searchEntry.description?.toLowerCase().includes(searchTermLower) ||
-        searchEntry.ingredients?.some((ing: string) => ing.toLowerCase().includes(searchTermLower)) ||
-        searchEntry.keywords?.some((kw: string) => kw.includes(searchTermLower)) ||
-        searchEntry.searchText?.includes(searchTermLower);
-
-      if (matches) {
-        searchResults.push(searchEntry);
-      }
-    }
-
-    perfTrace.putAttribute('search_path', 'full_scan');
-
-    // Get full recipe details for matches (only fetch the recipes we need)
-    const fullRecipes: SavedRecipe[] = [];
-    if (searchResults.length > 0) {
-      // Batch get the full recipes, chunked to avoid unbounded parallel
-      // request bursts when a search matches a large number of index entries.
-      const recipeIds = searchResults.map(result => result.id);
-      for (let start = 0; start < recipeIds.length; start += RECIPE_FETCH_CHUNK_SIZE) {
-        const chunkIds = recipeIds.slice(start, start + RECIPE_FETCH_CHUNK_SIZE);
-        const recipeDocs = await Promise.all(chunkIds.map(id =>
-          DatabaseMonitoringService.getDoc(DatabaseMonitoringService.doc("recipes/" + id))
-        ));
-
-        for (const doc of recipeDocs as FirestoreDocLike[]) {
-          if (doc && (typeof doc.exists === 'function' ? (doc as FirestoreDocLike & { exists(): boolean }).exists() : (doc as FirestoreDocLike & { exists: boolean }).exists)) {
-            const d = doc.data();
-            fullRecipes.push({ id: doc.id, ...(d && typeof d === 'object' ? d as Record<string, unknown> : {}) } as SavedRecipe);
-          }
-        }
-      }
-    }
-
-    // Add custom metrics
-    perfTrace.putMetric('search_term_length', searchTerm.length);
-    perfTrace.putMetric('search_index_size', querySnapshot.docs.length);
-    perfTrace.putMetric('results_found', fullRecipes.length);
-
-    return fullRecipes;
-  } catch (err: unknown) {
-    log.error("Error searching recipes", err);
-    // Fallback to old method if search index fails
-    // Falling back to full collection search
-    return await searchRecipesInFirestoreFallback(searchTerm);
-  } finally {
-    perfTrace.stop();
-  }
-};
-
-// Fallback search method (original implementation)
-const FALLBACK_SEARCH_SCAN_LIMIT = 500;
-
-const searchRecipesInFirestoreFallback = async (searchTerm: string): Promise<SavedRecipe[]> => {
-  try {
-    const recipesRef = DatabaseMonitoringService.collection("recipes");
-    // Bound the collection scan instead of reading the entire (potentially
-    // unbounded) 'recipes' collection into memory.
-    const q = DatabaseMonitoringService.query(
-      recipesRef,
-      DatabaseMonitoringService.limit(FALLBACK_SEARCH_SCAN_LIMIT)
-    );
-    const querySnapshot = await DatabaseMonitoringService.getDocs(q);
-
-    const allRecipes = querySnapshot.docs.map((doc: FirestoreDocLike) => {
-      const d = doc.data();
-      return ({ id: doc.id, ...(d && typeof d === 'object' ? d as Record<string, unknown> : {}) } as SavedRecipe);
-    });
-
-    // Filter by search term (case-insensitive)
     const filteredRecipes = allRecipes.filter((recipe: SavedRecipe) =>
-      String(recipe.title || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
-      String((recipe as unknown as { description?: string }).description || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
-      Array.isArray((recipe as unknown as { ingredients?: string[] }).ingredients) && ((recipe as unknown as { ingredients: string[] }).ingredients).some((ing: string) => String(ing || '').toLowerCase().includes(searchTerm.toLowerCase()))
+      String(recipe.title || '').toLowerCase().includes(searchTermLower) ||
+      String((recipe as unknown as { description?: string }).description || '').toLowerCase().includes(searchTermLower) ||
+      (Array.isArray((recipe as unknown as { ingredients?: string[] }).ingredients) &&
+        ((recipe as unknown as { ingredients: string[] }).ingredients).some((ing: string) => String(ing || '').toLowerCase().includes(searchTermLower)))
     );
+
+    perfTrace.putMetric('search_term_length', searchTerm.length);
+    perfTrace.putMetric('search_index_size', allRecipes.length);
+    perfTrace.putMetric('results_found', filteredRecipes.length);
+    perfTrace.putAttribute('search_path', 'cached');
 
     return filteredRecipes;
   } catch (err: unknown) {
-    log.error("Error in fallback search", err);
+    log.error("Error searching recipes", err);
     return [];
+  } finally {
+    perfTrace.stop();
   }
 };
 

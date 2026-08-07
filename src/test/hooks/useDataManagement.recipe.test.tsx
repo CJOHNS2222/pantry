@@ -4,7 +4,7 @@ import { useDataManagement } from '../../../hooks/useDataManagement';
 import { PantryItem, StructuredRecipe } from '../../../types';
 import FoodWasteAnalyticsService from '../../../services/foodWasteAnalyticsService';
 import { InventoryCacheService } from '../../../services/inventoryCacheService';
-import { pruneNotificationsForDeletedItems } from '../../../services/notificationsService';
+import { pruneNotificationsForDeletedItems } from '../../../services/notificationCacheService';
 
 // Mock Services
 vi.mock('../../../services/foodWasteAnalyticsService', () => ({
@@ -23,7 +23,7 @@ vi.mock('../../../services/inventoryCacheService', () => ({
   }
 }));
 
-vi.mock('../../../services/notificationsService', () => ({
+vi.mock('../../../services/notificationCacheService', () => ({
   pruneNotificationsForDeletedItems: vi.fn().mockResolvedValue(undefined),
 }));
 

@@ -75,10 +75,9 @@ export default function LeftoverQuickCapture({
       setLoading(false)
       onSaved?.(leftover.id)
       onClose?.()
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    } catch (err: any) {
+    } catch (err) {
       setLoading(false)
-      setError(err?.message || 'Failed to save leftover')
+      setError(err instanceof Error ? err.message : 'Failed to save leftover')
       log.error('Leftover save failed', { error: err }, 'LeftoverQuickCapture')
     }
   }

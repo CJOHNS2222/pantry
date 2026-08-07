@@ -5,6 +5,7 @@ import { log } from '../../services/logService';
 import { PantryItem, RecipeSuggestion, SavedRecipe, User } from '../../types';
 import { Tab } from '../../types/app';
 import { useSubscription } from '../../hooks/useSubscription';
+import { useAppActions } from '../../contexts/AppActionsContext';
 
 /**
  * Interface for smart recommendation data
@@ -48,6 +49,7 @@ interface SmartRecommendationsProps {
 const SmartRecommendations: React.FC<SmartRecommendationsProps> = ({ inventory, savedRecipes, user, setActiveTab, recipeSuggestions = [], onDeleteItem, setInitialSearchQuery }) => {
   const [isCollapsed, setIsCollapsed] = useState(true);
   const { isPremium } = useSubscription(user ?? null);
+  const { setActiveSettingsCategory } = useAppActions();
   const recommendations = useMemo((): SmartRecommendation[] => {
     const recs: SmartRecommendation[] = [];
 
@@ -199,7 +201,7 @@ const SmartRecommendations: React.FC<SmartRecommendationsProps> = ({ inventory, 
         break;
       case 'feature':
         if (rec.actionText.includes('Upgrade Now')) {
-          sessionStorage.setItem('settings_redirect_tab', 'more');
+          setActiveSettingsCategory('subscription');
           setActiveTab(Tab.SETTINGS);
         } else if (rec.actionText.includes('Create Meal Plan')) {
           setActiveTab(Tab.SETTINGS);

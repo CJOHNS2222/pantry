@@ -9,7 +9,7 @@ import {
   RecipeFeedback
 } from '../types';
 import { log } from './logService';
-import { upsertCommunityRatedRecipeByTitle, saveRecipeToFirestore, getCachedRecipesCache } from './recipeService';
+import { upsertCommunityRatedRecipeByTitle, saveRecipeToFirestore, getAllCachedRecipes } from './recipeService';
 import type { RecipeRecommendation } from './recipeRecommendationService';
 
 // Recursively remove undefined properties (preserve Timestamp and other non-plain values)
@@ -108,20 +108,16 @@ export class RecipeRatingService {
    */
   private static async ensureRecipeExists(recipe: StructuredRecipe, userId: string): Promise<string> {
     try {
-      // Check if recipe already exists by title
-      const existingQuery = DatabaseMonitoringService.query(
-        DatabaseMonitoringService.collection('recipes'),
-        DatabaseMonitoringService.where('title', '==', recipe.title),
-        DatabaseMonitoringService.limit(1)
-      );
-      const existingDocs = await DatabaseMonitoringService.getDocs(existingQuery);
+      // Check if recipe already exists by title against the in-memory recipe
+      // caches (never query 'recipes' directly for an existence check).
+      const cached = await getAllCachedRecipes();
+      const existing = cached.find(r => r.title === recipe.title);
 
       let recipeId: string;
-      if (!existingDocs.empty) {
-        // Recipe already exists, get its ID
-        recipeId = existingDocs.docs[0].id;
+      if (existing?.id) {
+        recipeId = existing.id;
       } else {
-        // Recipe doesn't exist, save it
+        // Not in the cache — save it (creates the doc if it's genuinely new).
         recipeId = await saveRecipeToFirestore(recipe, { userId, visibility: 'public' });
       }
 
@@ -520,8 +516,9 @@ export class RecipeRatingService {
       // Simple recommendation logic (can be enhanced with ML)
       const recommendations: RecipeRecommendation[] = [];
 
-      // Load full recipe objects from the shared cache for title lookup and ingredient matching
-      const allCachedRecipes = await getCachedRecipesCache();
+      // Load full recipe objects from the merged recipe caches for title lookup and
+      // ingredient matching (never query 'recipes' directly).
+      const allCachedRecipes = await getAllCachedRecipes();
       const recipeByTitle = new Map(allCachedRecipes.map(r => [r.title.toLowerCase(), r]));
 
       // Household-loved recipes that user hasn't rated
@@ -541,27 +538,7 @@ export class RecipeRatingService {
 
         for (const [recipeTitle, count] of sortedLoved) {
           const c = Number(count || 0);
-          let fullRecipe: StructuredRecipe | undefined = recipeByTitle.get(recipeTitle.toLowerCase());
-          
-          if (!fullRecipe) {
-            try {
-              const existingQuery = DatabaseMonitoringService.query(
-                DatabaseMonitoringService.collection('recipes'),
-                DatabaseMonitoringService.where('title', '==', recipeTitle),
-                DatabaseMonitoringService.limit(1)
-              );
-              const existingDocs = await DatabaseMonitoringService.getDocs(existingQuery);
-              if (!existingDocs.empty) {
-                const data = existingDocs.docs[0].data() as StructuredRecipe;
-                fullRecipe = {
-                  id: existingDocs.docs[0].id,
-                  ...data
-                };
-              }
-            } catch (err) {
-              log.warn('Failed to fetch recipe from database for recommendation', { recipeTitle, error: err });
-            }
-          }
+          const fullRecipe: StructuredRecipe | undefined = recipeByTitle.get(recipeTitle.toLowerCase());
 
           if (!fullRecipe) continue;
 

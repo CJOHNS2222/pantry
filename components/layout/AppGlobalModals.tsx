@@ -1,7 +1,10 @@
 import React, { Suspense } from 'react';
 import { useIntl } from 'react-intl';
-import { User, Household, PantryItem, StructuredRecipe, DayPlan, CustomCategory } from '../../types';
+import { User, Household, PantryItem, StructuredRecipe, DayPlan, CustomCategory, SavedRecipe, RecipeRating } from '../../types';
 import { Tab } from '../../types/app';
+import { useAppModals } from '../../hooks/useAppModals';
+import { useNotificationHandlers } from '../../hooks/useNotificationHandlers';
+import { useFeatureMilestones } from '../../hooks/useFeatureMilestones';
 import { Modal } from '../ui/Modal';
 import { Button } from '../ui/Button';
 import ExpiredItemsLaunchSheet from '../pantry/ExpiredItemsLaunchSheet';
@@ -44,20 +47,15 @@ interface AppGlobalModalsProps {
   deleteItems: (indices: number[], disposalReason?: 'thrown_away' | 'cooked' | 'remove') => Promise<void>;
   handleAddToPlan: (recipe: StructuredRecipe, dayIndex?: number, mealType?: 'breakfast' | 'lunch' | 'dinner') => void;
   handleSaveRecipe: (recipe: StructuredRecipe) => Promise<void>;
-  /* eslint-disable-next-line @typescript-eslint/no-explicit-any */
-  handleDeleteRecipe: (recipe: any) => void;
-  /* eslint-disable-next-line @typescript-eslint/no-explicit-any */
-  submitRating: (rating: any) => void;
+  handleDeleteRecipe: (recipe: SavedRecipe) => void;
+  submitRating: (rating: RecipeRating) => void;
   handleMarkAsMade: (recipe: StructuredRecipe) => void;
   addToShoppingList: (items: (string | { item: string; source: string; notes?: string })[]) => void;
   setActiveTab: (tab: Tab) => void;
   addToast: (message: string, type?: 'success' | 'error' | 'info' | 'warning', ttl?: number) => void;
-  /* eslint-disable-next-line @typescript-eslint/no-explicit-any */
-  modals: any;
-  /* eslint-disable-next-line @typescript-eslint/no-explicit-any */
-  notificationHandlers: any;
-  /* eslint-disable-next-line @typescript-eslint/no-explicit-any */
-  featureMilestones: any;
+  modals: ReturnType<typeof useAppModals>;
+  notificationHandlers: ReturnType<typeof useNotificationHandlers>;
+  featureMilestones: ReturnType<typeof useFeatureMilestones>;
 }
 
 const LoadingSpinner: React.FC = () => (

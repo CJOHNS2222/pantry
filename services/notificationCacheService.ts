@@ -8,22 +8,22 @@ import { log } from './logService';
  * per-user Firestore notifications cache document (`users/{uid}/cache/notifications`).
  * This is a superset covering both plain push-style entries (title/body/data)
  * and the richer records `NotificationService` builds (priority/actionType/etc,
- * see `AppNotification` in `notificationService.ts`) — this file only reads/
+ * see `AppNotification` in `notificationBuilderService.ts`) — this file only reads/
  * writes/prunes the cache document and doesn't care which shape a given entry
  * originally had. Renamed (F38) from a same-named type that used to collide
- * with the one in `notificationService.ts`.
+ * with the one in `notificationBuilderService.ts`.
  */
 export interface NotificationCacheItem {
   id: string;
   title: string;
   body?: string;
-  /** Rich body text written by notificationService.ts */
+  /** Rich body text written by notificationBuilderService.ts */
   message?: string;
   data?: Record<string, any>;
   createdAt?: any;
   read?: boolean;
   dedupeKey?: string;
-  // Rich fields present when created via notificationService.ts
+  // Rich fields present when created via notificationBuilderService.ts
   type?: string;
   priority?: 'low' | 'medium' | 'high' | 'urgent';
   actionLabel?: string;
@@ -124,7 +124,7 @@ async function _appendWithRetry(uid: string, notification: NotificationCacheItem
     log.error('appendNotificationToUser failed after retries', {
       error: err?.message || err,
       notificationId: notification?.id
-    }, 'notificationsService');
+    }, 'notificationCacheService');
     throw err;
   }
 }

@@ -30,8 +30,8 @@ android {
         // in sync with libs.versions.toml's `compileSdk` by hand.
         minSdk rootProject.ext.minSdkVersion
         targetSdk rootProject.ext.targetSdkVersion
-        versionCode 115
-        versionName "3.0.22"
+        versionCode 116
+        versionName "3.0.23"
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         
         buildFeatures {
@@ -92,6 +92,7 @@ dependencies {
 
   implementation fileTree(include: ['*.jar'], dir: 'libs')
   implementation libs.androidx.appcompat
+  implementation libs.androidx.core
   implementation libs.androidx.coordinatorlayout
   implementation libs.androidx.core.splashscreen
   implementation project(':capacitor-android')

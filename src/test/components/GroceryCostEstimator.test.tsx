@@ -9,6 +9,7 @@ vi.mock('../../../services/groceryPriceService', () => ({
   groceryPriceService: {
     getIngredientPrice: vi.fn(),
     submitPriceUpdate: vi.fn(),
+    getDefaultPrice: vi.fn().mockReturnValue({ price: 2.99, unit: 'unit' }),
   },
 }));
 
@@ -199,7 +200,7 @@ describe('GroceryCostEstimator', () => {
     const totalCostContainer = screen.getByText('Estimated cost for missing ingredients').previousElementSibling;
     expect(totalCostContainer).toBeInTheDocument();
     expect(totalCostContainer).toHaveClass('text-2xl', 'font-bold', 'text-green-600');
-    expect(totalCostContainer).toHaveTextContent('$15.74');
+    expect(totalCostContainer).toHaveTextContent('$17.94');
   });
 
   it('handles empty meal plan', () => {

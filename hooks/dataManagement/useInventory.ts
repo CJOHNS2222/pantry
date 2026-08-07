@@ -7,8 +7,8 @@ import { log } from '../../services/logService';
 import { generateRecipeSuggestions, shouldShowExpiryAlert, generateExpirationAlerts, localDateString, parseLocalDateString } from '../../utils/appUtils';
 import { offlineQueue } from '../../services/offlineQueueService';
 import { undoService, UndoAction } from '../../services/undoService';
-import { NotificationService } from '../../services/notificationService';
-import { pruneNotificationsForDeletedItems } from '../../services/notificationsService';
+import { NotificationService } from '../../services/notificationBuilderService';
+import { pruneNotificationsForDeletedItems } from '../../services/notificationCacheService';
 import { auth } from '../../firebaseConfig';
 import { InventoryCacheService, CachedInventoryData, CacheMetadata } from '../../services/inventoryCacheService';
 import { PantryService } from '../../services/pantryService';
@@ -249,7 +249,7 @@ export function useInventory(
   const recordUndo = async (type: string, data: unknown) => {
     if (!user?.id) return;
     try {
-      await undoService.recordAction({ type: type as 'delete_item' | 'bulk_edit' | 'update_item', data }, user.id);
+      await undoService.recordAction({ type: type as 'delete_item' | 'bulk_edit' | 'update_item' | 'bulk_delete', data }, user.id);
       const actions = await undoService.getRecentActions(user.id);
       setRecentActions(actions);
     } catch (err) {
@@ -321,9 +321,20 @@ export function useInventory(
       const actionToUndo = action || (await undoService.getRecentActions(user.id, 1))[0];
       if (!actionToUndo) return;
 
+      let undoMessage = 'Last action undone';
+
       if (actionToUndo.type === 'delete_item') {
         const itemToRestore = actionToUndo.data as PantryItem;
         await addItem(itemToRestore);
+        undoMessage = `Restored "${itemToRestore.item}"`;
+      } else if (actionToUndo.type === 'bulk_delete') {
+        const itemsToRestore = actionToUndo.data as PantryItem[];
+        for (const item of itemsToRestore) {
+          await addItem(item);
+        }
+        undoMessage = itemsToRestore.length === 1
+          ? `Restored "${itemsToRestore[0].item}"`
+          : `Restored ${itemsToRestore.length} items`;
       } else if (actionToUndo.type === 'update_item') {
         const { itemId, previousState } = actionToUndo.data as { itemId: string; previousState: PantryItem };
 
@@ -338,12 +349,13 @@ export function useInventory(
           // If it was somehow deleted in the meantime, restore it entirely
           await addItem(previousState);
         }
+        undoMessage = `Reverted edit to "${previousState.item}"`;
       }
 
       await undoService.removeAction(actionToUndo.id);
       const actions = await undoService.getRecentActions(user.id);
       setRecentActions(actions);
-      addToast?.('Last action undone', 'success');
+      addToast?.(undoMessage, 'success');
     } catch (err) {
       log.error('Failed to perform undo:', err, 'DataManagement');
       addToast?.('Failed to undo last action', 'error');
@@ -575,6 +587,8 @@ export function useInventory(
         log.warn('Failed to record waste disposal on bulk delete', { error: err }, 'DataManagement');
       }
     }
+
+    await recordUndo('bulk_delete', itemsToDelete);
 
     HapticService.medium();
     const updatedInventory = inventory.filter((_, i) => !indexSet.has(i));

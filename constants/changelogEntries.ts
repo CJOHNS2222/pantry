@@ -20,6 +20,15 @@ export interface DetailedChangeEntry {
 
 export const RECENT_CHANGES: ChangeEntry[] = [
   {
+    "version": "3.0.23",
+    "date": "Aug 7, 2026",
+    "highlights": [
+      "Renamed notification services for clarity — notificationService.ts and notificationsService.ts are now…",
+      "Removed remaining `any` types",
+      "Added a typed Web Speech Recognition surface"
+    ]
+  },
+  {
     "version": "3.0.22",
     "date": "Aug 6, 2026",
     "highlights": [
@@ -37,20 +46,24 @@ export const RECENT_CHANGES: ChangeEntry[] = [
       "Subscription Management & Purchase Security — Enhanced verification, subscription check loops, and RTDN handling for…",
       "Shopping List Cache & Storage Optimization — Optimized offline caching and shopping list retrieval mechanics."
     ]
-  },
-  {
-    "version": "3.0.20",
-    "date": "Aug 5, 2026",
-    "highlights": [
-      "Subscription Management Security & Purchase Flows — Reinforced security rules to prevent client-side modifications of…",
-      "Google Play RTDN & Sync Automation — Improved Pub/Sub notification handling with plan-change validation to prevent…",
-      "Gemini Search Recipe Caching Optimization — Redesigned caching architecture to write chunked recipe arrays under…",
-      "Household Membership Verification — Enforced subscription status validation in family group limit calculations,…"
-    ]
   }
 ];
 
 export const ALL_CHANGES: DetailedChangeEntry[] = [
+  {
+    "version": "3.0.23",
+    "date": "Aug 7, 2026",
+    "sections": [
+      {
+        "title": "Added / Changed / Fixed",
+        "bullets": [
+          "**Renamed notification services for clarity** — `notificationService.ts` and `notificationsService.ts` are now `notificationBuilderService.ts` and `notificationCacheService.ts`, removing the confusing near-identical filenames.",
+          "**Removed remaining `any` types** across dashboards, modals, and pantry/recipe components — dashboard metrics, performance entries, and recipe/rating handlers are now fully typed for better editor support and fewer runtime surprises.",
+          "**Added a typed Web Speech Recognition surface** shared by voice-input features, replacing ad-hoc per-component shims."
+        ]
+      }
+    ]
+  },
   {
     "version": "3.0.22",
     "date": "Aug 6, 2026",
