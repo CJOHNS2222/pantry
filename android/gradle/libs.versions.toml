@@ -4,7 +4,7 @@
 # available, so it can't reference `libs.versions.agp` directly — F50).
 # compileSdk must match `compileSdkVersion` in android/variables.gradle (see the comment
 # there for why minSdk/targetSdk live in variables.gradle instead of here).
-agp = "8.13.2"
+agp = "9.3.1"
 kotlin = "2.4.0"
 firebase-bom = "34.15.0"
 appcompat = "1.7.1"

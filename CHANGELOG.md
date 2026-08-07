@@ -1,3 +1,14 @@
+## [3.0.22] - 2026-08-06
+
+### Added / Changed / Fixed
+- **Fixed: Shopping list appeared empty** — Lists using an older cache format were silently ignored, showing no items even though they were saved. These now load correctly and migrate automatically on first open.
+- **Fixed: Google Play subscriptions not activating** — Purchases failed to upgrade the account tier. Purchase verification and plan-change handling now work end to end.
+- **Fixed: Manually added shopping list items disappearing** — Items added via the add-item dialog were not saved and vanished on refresh.
+- **Added: Long-press to select** — Long-press any pantry item to enter bulk-select mode with that item already selected.
+- **Fixed: Bulk action bar hidden behind the navigation bar** on Android devices with gesture navigation.
+
+---
+
 ## [3.0.21] - 2026-08-06
 
 ### Added / Changed / Fixed

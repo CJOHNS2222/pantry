@@ -10,7 +10,7 @@ buildscript {
         // AGP version — must match `agp` in gradle/libs.versions.toml by hand. This
         // buildscript block resolves before the version catalog is available, so it
         // can't reference `libs.versions.agp.get()` directly (F50).
-        classpath 'com.android.tools.build:gradle:8.13.2'
+        classpath 'com.android.tools.build:gradle:9.3.1'
 
     }
 }

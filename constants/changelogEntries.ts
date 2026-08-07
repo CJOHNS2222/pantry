@@ -20,6 +20,16 @@ export interface DetailedChangeEntry {
 
 export const RECENT_CHANGES: ChangeEntry[] = [
   {
+    "version": "3.0.22",
+    "date": "Aug 6, 2026",
+    "highlights": [
+      "Fixed: Shopping list appeared empty — Lists using an older cache format were silently ignored, showing no items even…",
+      "Fixed: Google Play subscriptions not activating — Purchases failed to upgrade the account tier.",
+      "Fixed: Manually added shopping list items disappearing — Items added via the add-item dialog were not saved and…",
+      "Added: Long-press to select — Long-press any pantry item to enter bulk-select mode with that item already selected."
+    ]
+  },
+  {
     "version": "3.0.21",
     "date": "Aug 6, 2026",
     "highlights": [
@@ -37,20 +47,26 @@ export const RECENT_CHANGES: ChangeEntry[] = [
       "Gemini Search Recipe Caching Optimization — Redesigned caching architecture to write chunked recipe arrays under…",
       "Household Membership Verification — Enforced subscription status validation in family group limit calculations,…"
     ]
-  },
-  {
-    "version": "3.0.19",
-    "date": "Aug 4, 2026",
-    "highlights": [
-      "Pantry Bulk Selection Location — Moved the bulk select mode toggle button from the search toolbar to the storage…",
-      "Copy to Shopping List Confirmation — Changed the bulk select footer \"shopping\" button to copy selected items to the…",
-      "Recipe Finder Layout Spacing — Wrapped recipe finder search controls in a unified spacing container to eliminate…",
-      "Gemini Search Images & Background Caching — Added high-quality Unsplash image matching for Gemini search results, and…"
-    ]
   }
 ];
 
 export const ALL_CHANGES: DetailedChangeEntry[] = [
+  {
+    "version": "3.0.22",
+    "date": "Aug 6, 2026",
+    "sections": [
+      {
+        "title": "Added / Changed / Fixed",
+        "bullets": [
+          "**Fixed: Shopping list appeared empty** — Lists using an older cache format were silently ignored, showing no items even though they were saved. These now load correctly and migrate automatically on first open.",
+          "**Fixed: Google Play subscriptions not activating** — Purchases failed to upgrade the account tier. Purchase verification and plan-change handling now work end to end.",
+          "**Fixed: Manually added shopping list items disappearing** — Items added via the add-item dialog were not saved and vanished on refresh.",
+          "**Added: Long-press to select** — Long-press any pantry item to enter bulk-select mode with that item already selected.",
+          "**Fixed: Bulk action bar hidden behind the navigation bar** on Android devices with gesture navigation."
+        ]
+      }
+    ]
+  },
   {
     "version": "3.0.21",
     "date": "Aug 6, 2026",

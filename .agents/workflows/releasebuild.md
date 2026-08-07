@@ -6,6 +6,8 @@ description: full release build pipeline
 name: release-build
 description: '**WORKFLOW SKILL** — Full release pipeline: type-check, version bump, changelog, production build, Capacitor sync, Firestore version publish, git commit, and push to GitHub. USE FOR: releasing new versions end-to-end with a single command. DO NOT USE FOR: development builds, testing, or partial updates.'
 ---
+### No reason to make an implementation plan. Just follow the Pipeline below.
+
 
 # Release Build (Full Pipeline)
 
@@ -54,7 +56,9 @@ git commit -m "chore: release v{version}"
 Run `git push` to push the commit to the current remote branch.
 
 ### 10. Build signed bundle
-Run `cd android; .\gradlew bundleRelease` to assemble signedrelease bundle.
+Run `cd android; .\gradlew bundleRelease` to assemble signedrelease bundle and './gradlew :app:bundleDebug' for a debug bundle.
+
+### 11.  Write me release notes i can send with the update to play console. 120 character maximum.
 
 ## Parameters
 
