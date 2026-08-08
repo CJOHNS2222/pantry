@@ -5,7 +5,7 @@ import PerformanceMonitoringService from '../services/performanceMonitoringServi
 import { trackShoppingListAction } from '../services/sentryService';
 import HapticService from '../services/hapticService';
 import { getUserMeasurementSystem, convertIngredientString } from '../utils/measurementUtils';
-import { parseIngredientForShoppingList, inferCategoryFromItemName, parseQuantityAndUnit, isHouseholdMember, getItemImage, fetchExternalItemImage, inferStorageLocationFromItemName } from '../utils/appUtils';
+import { parseIngredientForShoppingList, inferCategoryFromItemName, parseQuantityAndUnit, isHouseholdMember, getItemImage, inferStorageLocationFromItemName } from '../utils/appUtils';
 import { groceryPriceService } from '../services/groceryPriceService';
 import { ShoppingListCacheService } from '../services/shoppingListCacheService';
 import { getQuantityAmount } from '../utils/quantityUtils';
@@ -100,27 +100,9 @@ export function usePantryShoppingActions({
   }, [household, user, setShoppingList, setActiveTab]);
 
   const handleMoveToPantry = useCallback(async (items: ShoppingItem[]) => {
-    try {
-      const { getCachedImageUrls } = await import('../services/imageCacheService');
-      await getCachedImageUrls(items.map(i => i.item));
-    } catch (error) {
-      log.error('Failed to pre-fetch cached image URLs', { error }, 'App');
-    }
-
     const processedItems = await Promise.all(items.map(async (i) => {
       const category = inferCategoryFromItemName(i.item);
-      let image = getItemImage(i.item, category);
-
-      if (image === '/images/placeholder.svg') {
-        try {
-          const externalImage = await fetchExternalItemImage(i.item);
-          if (externalImage) {
-            image = externalImage;
-          }
-        } catch (error) {
-          log.debug('Failed to fetch external image', { item: i.item, error }, 'App');
-        }
-      }
+      const image = getItemImage(i.item, category);
 
       let addQty = getQuantityAmount(i.purchasedQuantity ?? i.quantity ?? i.purchasedBatch ?? 1);
       if (addQty < 1) addQty = 1;

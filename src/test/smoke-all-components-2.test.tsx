@@ -44,7 +44,6 @@ vi.useFakeTimers({ toFake: ['setInterval', 'clearInterval'] });
 const SKIP_COMPONENTS = new Set([
   'AdMobBanner',
   'QuickAdd',
-  'PantryScanner',
 ]);
 
 describe('Smoke tests: render components (R–Z)', () => {

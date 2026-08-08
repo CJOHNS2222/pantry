@@ -68,7 +68,33 @@ export function usePantryQuickConsume({
     }
   }, []);
 
-  useEffect(() => clearLongPressTimer, [clearLongPressTimer]);
+  // Cancels the pending long-press if the page scrolls while the pointer is
+  // down — a real long-press (finger held still) never coincides with a
+  // scroll, so this catches slow/momentum scrolls that stay within the
+  // pointer-move distance threshold for the whole hold window.
+  const scrollCancelHandlerRef = useRef<(() => void) | null>(null);
+
+  const disarmScrollCancelListener = useCallback(() => {
+    if (scrollCancelHandlerRef.current) {
+      window.removeEventListener('scroll', scrollCancelHandlerRef.current, true);
+      scrollCancelHandlerRef.current = null;
+    }
+  }, []);
+
+  const armScrollCancelListener = useCallback(() => {
+    disarmScrollCancelListener();
+    const handler = () => {
+      clearLongPressTimer();
+      disarmScrollCancelListener();
+    };
+    scrollCancelHandlerRef.current = handler;
+    window.addEventListener('scroll', handler, { capture: true, passive: true });
+  }, [clearLongPressTimer, disarmScrollCancelListener]);
+
+  useEffect(() => () => {
+    clearLongPressTimer();
+    disarmScrollCancelListener();
+  }, [clearLongPressTimer, disarmScrollCancelListener]);
 
   const applyQuickConsume = useCallback(async (item: DisplayedPantryItem) => {
     const original = inventory[item.originalIndex];
@@ -132,8 +158,15 @@ export function usePantryQuickConsume({
         gestureStartRef.current = { x: e.clientX, y: e.clientY };
         longPressFiredRef.current = false;
         clearLongPressTimer();
+        // A slow or momentum-driven scroll can hold the pointer within the 10px
+        // move threshold for the whole LONG_PRESS_MS window (finger anchored
+        // while the page scrolls under it), so pointer movement alone isn't a
+        // reliable "this isn't a long-press" signal. Cancel on any actual page
+        // scroll too — a genuine long-press never coincides with the page moving.
+        armScrollCancelListener();
         longPressTimerRef.current = window.setTimeout(() => {
           longPressFiredRef.current = true;
+          disarmScrollCancelListener();
           // Haptic confirms the mode switch on touch devices, where there is no
           // hover/cursor feedback to signal that the press registered.
           void HapticService.medium();
@@ -150,10 +183,12 @@ export function usePantryQuickConsume({
         const dy = Math.abs(e.clientY - gestureStartRef.current.y);
         if (dx > 10 || dy > 10) {
           clearLongPressTimer();
+          disarmScrollCancelListener();
         }
       },
       onPointerUp: async (e: React.PointerEvent) => {
         clearLongPressTimer();
+        disarmScrollCancelListener();
         // A fired long-press already handled this gesture — don't also treat the
         // release as a swipe (or let the row's onClick open the detail modal).
         if (longPressFiredRef.current) {
@@ -180,17 +215,19 @@ export function usePantryQuickConsume({
       },
       onPointerLeave: () => {
         clearLongPressTimer();
+        disarmScrollCancelListener();
       },
       // Android fires pointercancel when the system claims the gesture (scroll
       // takeover, back-swipe). Without this the timer would survive and fire a
       // selection after the user had already moved on.
       onPointerCancel: () => {
         clearLongPressTimer();
+        disarmScrollCancelListener();
         gestureStartRef.current = null;
         longPressFiredRef.current = false;
       },
     };
-  }, [bulkMode, applyQuickConsume, applyQuickAddToShopping, clearLongPressTimer, onSelectItem, onLongPressSelect, onToggleSelect]);
+  }, [bulkMode, applyQuickConsume, applyQuickAddToShopping, clearLongPressTimer, onSelectItem, onLongPressSelect, onToggleSelect, armScrollCancelListener, disarmScrollCancelListener]);
 
   /**
    * True when the gesture that just ended was a long-press or swipe, meaning the

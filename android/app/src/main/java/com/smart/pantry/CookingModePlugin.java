@@ -7,6 +7,7 @@ import android.view.View;
 import android.view.Window;
 import android.view.WindowInsets;
 import android.view.WindowInsetsController;
+import android.webkit.WebView;
 import androidx.core.view.WindowCompat;
 import com.getcapacitor.Plugin;
 import com.getcapacitor.PluginCall;
@@ -63,6 +64,7 @@ public class CookingModePlugin extends Plugin {
                         @Override
                         public void run() {
                             content.requestLayout();
+                            refreshWebViewTouchRegion();
                         }
                     });
 
@@ -110,6 +112,7 @@ public class CookingModePlugin extends Plugin {
                         @Override
                         public void run() {
                             content.requestLayout();
+                            refreshWebViewTouchRegion();
                         }
                     });
 
@@ -117,6 +120,34 @@ public class CookingModePlugin extends Plugin {
                 } catch (Exception e) {
                     call.reject("Failed to disable cooking mode: " + e.getMessage(), e);
                 }
+            }
+        });
+    }
+
+    // A decorView.requestLayout() re-lays-out the activity's view tree, but Chromium's
+    // internal touch hit-test region for the WebView isn't necessarily recomputed from
+    // that alone — it needs the WebView itself to see a real size change. Toggling its
+    // measured size by 1px and back forces WebView.onSizeChanged, which re-syncs the
+    // hit-test region with the view's actual (post-rotation/inset) bounds.
+    private void refreshWebViewTouchRegion() {
+        Activity activity = getActivity();
+        if (activity == null) return;
+
+        WebView webView = getBridge() != null ? getBridge().getWebView() : null;
+        if (webView == null) return;
+
+        final int width = webView.getWidth();
+        final int height = webView.getHeight();
+        if (width <= 0 || height <= 0) return;
+
+        webView.requestLayout();
+        webView.setRight(webView.getLeft() + width - 1);
+        webView.post(new Runnable() {
+            @Override
+            public void run() {
+                webView.setRight(webView.getLeft() + width);
+                webView.requestLayout();
+                webView.invalidate();
             }
         });
     }

@@ -80,7 +80,7 @@ class UsageService {
   // search flow (RecipeFinder canPerformSearch → searchRecipes canUseGemini all read
   // the same 'users/{uid}/usage/limits' doc). 30s TTL is negligible for limit enforcement.
   private static readonly LIMITS_CACHE_TTL_MS = 30_000;
-  private static limitsCache = new Map<string, { limits: UsageLimits; fetchedAt: number }>();
+  private static limitsCache = new Map<string, { limits: UsageLimits; fetchedAt: number; subKey: string }>();
 
   private static buildPlanLimits(): PlanLimits {
     return {
@@ -118,9 +118,12 @@ class UsageService {
     }
 
     // Deduplicate reads — RecipeFinder + canPerformSearch + canUseGemini all read
-    // the same doc; one Firestore read per 30s window is enough
+    // the same doc; one Firestore read per 30s window is enough. Cache is keyed on
+    // subscription status+tier too so an expiry/upgrade mid-window invalidates it
+    // immediately instead of serving stale (e.g. premium) limits for up to 30s.
+    const subKey = `${user.subscription?.status || ''}:${user.subscription?.tier || ''}`;
     const cached = UsageService.limitsCache.get(user.id);
-    if (cached && Date.now() - cached.fetchedAt < UsageService.LIMITS_CACHE_TTL_MS) {
+    if (cached && cached.subKey === subKey && Date.now() - cached.fetchedAt < UsageService.LIMITS_CACHE_TTL_MS) {
       return cached.limits;
     }
 
@@ -211,7 +214,7 @@ class UsageService {
         lastUpdated: now
       });
 
-      UsageService.limitsCache.set(user.id, { limits: initialUsage, fetchedAt: Date.now() });
+      UsageService.limitsCache.set(user.id, { limits: initialUsage, fetchedAt: Date.now(), subKey });
       return initialUsage;
     }
 
@@ -281,7 +284,7 @@ class UsageService {
       },
       resolvedTier: planTier as 'free' | 'premium' | 'family'
     };
-    UsageService.limitsCache.set(user.id, { limits: result, fetchedAt: Date.now() });
+    UsageService.limitsCache.set(user.id, { limits: result, fetchedAt: Date.now(), subKey });
     return result;
   }
 

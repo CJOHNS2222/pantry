@@ -19,7 +19,7 @@ export const PullToRefresh: React.FC<PullToRefreshProps> = ({ onRefresh, childre
 
   const THRESHOLD = 60;
   // Deliberate hold once past THRESHOLD, so a quick accidental swipe never fires a refresh.
-  const HOLD_MS = 600;
+  const HOLD_MS = 1200;
 
   const clearHoldTimer = () => {
     if (holdTimerRef.current) {
@@ -64,7 +64,6 @@ export const PullToRefresh: React.FC<PullToRefreshProps> = ({ onRefresh, childre
       setPullDistance(distance);
 
       if (distance >= THRESHOLD && !holdTimerRef.current && !isHolding) {
-        HapticService.light();
         setIsHolding(true);
         holdTimerRef.current = setTimeout(() => {
           holdTimerRef.current = null;

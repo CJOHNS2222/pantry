@@ -3,7 +3,7 @@ import { useIntl } from 'react-intl';
 import { ShoppingCart, Barcode } from 'lucide-react';
 import { Capacitor } from '@capacitor/core';
 import { Share } from '@capacitor/share';
-import { ShoppingItem, User, Household, Settings, PantryItem } from '../../types';
+import { ShoppingItem } from '../../types';
 import { Tab } from '../../types/app';
 import HapticService from '../../services/hapticService';
 import { ShoppingListCacheService } from '../../services/shoppingListCacheService';
@@ -36,7 +36,12 @@ import { getSmartUnits } from '../pantry/QuantityUnitPicker';
 import { useOfflineStatus } from '../../hooks/useOfflineStatus';
 import { offlineQueue } from '../../services/offlineQueueService';
 import { useAppActions } from '../../contexts/AppActionsContext';
-import { useApp } from '../../contexts/AppContext';
+import { useUserContext } from '../../contexts/UserContext';
+import { useShoppingContext } from '../../contexts/ShoppingContext';
+import { useInventoryContext } from '../../contexts/InventoryContext';
+import { useMealPlanContext } from '../../contexts/MealPlanContext';
+import { useRecipeContext } from '../../contexts/RecipeContext';
+import { useSettingsDataContext } from '../../contexts/SettingsDataContext';
 import { useAndroidBack } from '../../hooks/useAndroidBack';
 import { groceryPriceService } from '../../services/groceryPriceService';
 import AnalyticsService from '../../services/analyticsService';
@@ -45,17 +50,6 @@ import { getUserMeasurementSystem } from '../../utils/measurementUtils';
 // Firestore access is instrumented via DatabaseMonitoringService when needed
 
 interface ShoppingListProps {
-  items: ShoppingItem[];
-  setItems: React.Dispatch<React.SetStateAction<ShoppingItem[]>>;
-  onMoveToPantry: (items: ShoppingItem[]) => void;
-  // Returns a promise (useShoppingList.addShoppingListItem is async). Typed as
-  // `void` previously, which silently discarded the promise at every call site —
-  // await had no effect and write failures could not be caught.
-  addShoppingListItem: (item: Omit<ShoppingItem, 'id'>) => Promise<void> | void;
-  user?: User;
-  household?: Household | null;
-  isLoadingShoppingList?: boolean;
-  pantryItems?: PantryItem[];
   recentPurchases?: Array<{
     itemName: string;
     quantity: number;
@@ -71,28 +65,23 @@ interface ShoppingListProps {
     currentActivity?: string;
   }>;
   onHouseholdMessage?: (message: string) => void;
-  settings?: Settings; // Settings object
 }
 
 const ShoppingListComponent: React.FC<ShoppingListProps> = ({
-  items,
-  setItems,
-  onMoveToPantry,
-  addShoppingListItem,
-  user,
-  household,
-  isLoadingShoppingList = false,
-  pantryItems: _pantryItems = [],
   recentPurchases: _recentPurchases = [],
   householdMembers = [],
-  onHouseholdMessage,
-  settings
+  onHouseholdMessage
 }) => {
   const intl = useIntl();
   const [newItem, setNewItem] = React.useState('');
   const [canShowAdBanner, setCanShowAdBanner] = React.useState<boolean>(false);
-  const { addToast, setActiveTab } = useAppActions();
-  const { mealPlan, savedRecipes } = useApp();
+  const { addToast, setActiveTab, onMoveToPantry, addShoppingListItem } = useAppActions();
+  const { user, household } = useUserContext();
+  const { shoppingList: items, setShoppingList: setItems, isLoadingShoppingList = false } = useShoppingContext();
+  const { inventory: _pantryItems = [] } = useInventoryContext();
+  const { mealPlan } = useMealPlanContext();
+  const { savedRecipes } = useRecipeContext();
+  const { settings } = useSettingsDataContext();
   const measurementSystem = useMemo(() => getUserMeasurementSystem(user?.profile), [user?.profile]);
 
   useEffect(() => {

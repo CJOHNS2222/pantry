@@ -3,7 +3,7 @@ import { Star, MessageSquare, Camera, Heart, X, Users, TrendingUp, ChefHat, Load
 import { RecipeRating, StructuredRecipe, RecipeFeedback, RecipePhoto, RecipeModification, RecipeCommunityStats } from '../../types';
 import { RecipeRatingService } from '../../services/recipeRatingService';
 import { RecipePhotoService } from '../../services/recipePhotoService';
-import AppContext from '../../contexts/AppContext';
+import UserContext from '../../contexts/UserContext';
 import { useToast } from '../ui/Toast';
 import { log } from '../../services/logService';
 import { RecipeCommunityInsights } from './RecipeCommunityInsights';
@@ -23,7 +23,7 @@ export const RecipeRatingUI: React.FC<RecipeRatingUIProps> = ({
   communityStats,
   householdId
 }) => {
-  const context = useContext(AppContext);
+  const context = useContext(UserContext);
   const contextUser = context?.user;
   const toast = useToast();
   const [existingRating, setExistingRating] = useState<RecipeRating | null>(null);

@@ -9,16 +9,18 @@ import AnalyticsService from '../../services/analyticsService';
 import { useNotifications } from '../../hooks/useNotifications';
 import { FAQPage } from './FAQPage';
 import { SettingsHelpSection } from './SettingsHelpSection';
-import { User, UserProfile, CustomCategory, Member } from '../../types';
-import type { Settings as AppSettings } from '../../types';
+import { User, UserProfile, Member } from '../../types';
+import { useNavigation } from '../../contexts/NavigationContext';
+import { useUserContext } from '../../contexts/UserContext';
+import { useMealPlanContext } from '../../contexts/MealPlanContext';
+import { useSettingsDataContext } from '../../contexts/SettingsDataContext';
+import { useAppActions } from '../../contexts/AppActionsContext';
 
 type MemberPreferences = Pick<Member, 'dietaryRestrictions' | 'allergies' | 'dietGoal' | 'favoriteCuisines' | 'specialNeeds' | 'preferredProteins' | 'dislikedIngredients'>;
 import { NotificationService, NotificationSettings } from '../../services/notificationBuilderService';
-import { DayPlan } from '../../types';
 import { Loader2, Heart, AlertTriangle, X, Settings as SettingsIcon, User as UserIcon, ChevronLeft, ChevronRight, Sliders, Bell, TrendingDown, MessageSquare, HelpCircle, RefreshCw, Sparkles, Shield, Star } from 'lucide-react';
 import { userOptedInToGemini, setUserGeminiOptIn, getGeminiUsage } from '../../services/featureFlags';
 
-import { Household } from '../../types';
 import { serverTimestamp } from 'firebase/firestore';
 import { InventoryCacheService } from '../../services/inventoryCacheService';
 import { MealPlanCacheService } from '../../services/MealPlanCacheService';
@@ -101,41 +103,22 @@ const defaultSettings = {
   },
 };
 
-interface SettingsProps {
-  settings: AppSettings;
-  setSettings: React.Dispatch<React.SetStateAction<AppSettings>>;
-  user?: User;
-  onLogout?: () => void;
-  customCategories?: CustomCategory[];
-  onAddCustomCategory?: (name: string, icon: string, color?: string) => void;
-  onUpdateCustomCategory?: (categoryId: string, updates: Partial<Pick<CustomCategory, 'name' | 'icon' | 'color'>>) => void;
-  onDeleteCustomCategory?: (categoryId: string) => void;
-  mealPlan?: DayPlan[];
-  household?: Household | null;
-  onShowHousehold?: () => void;
-  addToast?: (message: string, type: 'success' | 'error' | 'info' | 'warning', duration?: number) => void;
-  onReplayOnboarding?: () => void;
-  activeCategory?: string | null;
-  setActiveCategory?: React.Dispatch<React.SetStateAction<string | null>>;
-}
-
-const SettingsComponent: React.FC<SettingsProps> = ({
-  settings = defaultSettings, 
-  setSettings, 
-  user, 
-  onLogout,
-  customCategories = [],
-  onAddCustomCategory,
-  onUpdateCustomCategory,
-  onDeleteCustomCategory,
-  mealPlan,
-  household,
-  onShowHousehold,
-  addToast,
-  onReplayOnboarding,
-  activeCategory: propActiveCategory,
-  setActiveCategory: propSetActiveCategory,
-}) => {
+const SettingsComponent: React.FC = () => {
+  const { activeSettingsCategory: activeCategory } = useNavigation();
+  const { user, household } = useUserContext();
+  const { mealPlan } = useMealPlanContext();
+  const { settings = defaultSettings, customCategories = [] } = useSettingsDataContext();
+  const {
+    setSettings,
+    onLogout,
+    onAddCustomCategory,
+    onUpdateCustomCategory,
+    onDeleteCustomCategory,
+    onShowHousehold,
+    addToast,
+    onReplayOnboarding,
+    setActiveSettingsCategory: setActiveCategory,
+  } = useAppActions();
   const intl = useIntl();
   const confirm = useConfirm();
   const [feedback, setFeedback] = useState('');
@@ -143,11 +126,6 @@ const SettingsComponent: React.FC<SettingsProps> = ({
   const { isPremium, isFamily } = useSubscription(user || null);
   const [usageLimits, setUsageLimits] = useState<UsageLimits | null>(null);
   const { isAdmin } = useIsAdmin(user?.id);
-
-  // Backwards-compatible fallback to local state if parent did not pass category states
-  const [localActiveCategory, localSetActiveCategory] = useState<string | null>(null);
-  const activeCategory = propActiveCategory !== undefined ? propActiveCategory : localActiveCategory;
-  const setActiveCategory = propSetActiveCategory || localSetActiveCategory;
 
   useEffect(() => {
     if (!user) return;

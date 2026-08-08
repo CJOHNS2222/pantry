@@ -1,9 +1,23 @@
 // contexts/AppContext.tsx
-import React, { createContext, useContext, ReactNode } from 'react';
+//
+// Back-compat facade over the domain-scoped contexts (Navigation, Inventory,
+// Shopping, MealPlan, Recipe, User, SettingsData). `useApp()` composes all of
+// them so existing call sites keep working unchanged, but every field access
+// re-subscribes to ALL of them — components that only need one slice should
+// migrate to the scoped hook (useInventoryContext, useShoppingContext, ...)
+// to actually stop the cascade re-renders this split was meant to fix.
+import React, { ReactNode } from 'react';
 import { Tab } from '../types/app';
 import { User, PantryItem, DayPlan, ShoppingItem, SavedRecipe, RecipeRating, RecipeSearchResult, CustomCategory, Household, Settings, ConsumptionSuggestion, ExpirationAlert, RecipeSuggestion, HouseholdActivity } from '../types';
+import { NavigationProvider, useNavigation } from './NavigationContext';
+import { InventoryProvider, useInventoryContext } from './InventoryContext';
+import { ShoppingProvider, useShoppingContext } from './ShoppingContext';
+import { MealPlanProvider, useMealPlanContext } from './MealPlanContext';
+import { RecipeProvider, useRecipeContext } from './RecipeContext';
+import { UserProvider, useUserContext } from './UserContext';
+import { SettingsDataProvider, useSettingsDataContext } from './SettingsDataContext';
 
-// Core app state that should be available globally
+// Full app state shape — same public contract as before the context split.
 interface AppContextValue {
   // Navigation
   activeTab: Tab;
@@ -60,85 +74,122 @@ interface AppContextValue {
   isLoadingActivities: boolean;
 }
 
-const AppContext = createContext<AppContextValue | undefined>(undefined);
-
 interface AppProviderProps {
   children: ReactNode;
   value?: AppContextValue;
 }
 
-const defaultSettings: Settings = {
-  notifications: {
-    enabled: false,
-    time: '09:00',
-    types: { shoppingList: true, mealPlan: true, cookingReminders: true },
-    cookingReminderTime: 60,
-  },
-  theme: { mode: 'light', accentColor: '#0078d4', backgroundColor: undefined, textColor: undefined },
-  shopping: { includeStaples: true },
-};
-
-const defaultUser: User = {
-  id: '',
-  name: 'Guest',
-  email: '',
-  provider: 'email',
-  hasSeenTutorial: false,
-};
-
-const defaultAppContextValue: AppContextValue = {
-  activeTab: Tab.PANTRY,
-  setActiveTab: () => {},
-  user: defaultUser,
-  household: undefined,
-  inventory: [],
-  setInventory: () => {},
-  shoppingList: [],
-  setShoppingList: (() => {}) as React.Dispatch<React.SetStateAction<ShoppingItem[]>>,
-  mealPlan: [],
-  setMealPlan: (() => {}) as React.Dispatch<React.SetStateAction<DayPlan[]>>,
-  savedRecipes: [],
-  ratings: [],
-  persistedRecipeResult: null,
-  setPersistedRecipeResult: () => {},
-  initialSearchQuery: '',
-  setInitialSearchQuery: () => {},
-  settings: defaultSettings,
-  setSettings: () => {},
-  customCategories: [],
-  activeSettingsCategory: null,
-  recipeSaveLimitExceeded: false,
-  mealPlanLimitExceeded: false,
-  isLoadingInventory: false,
-  isLoadingShoppingList: false,
-  isLoadingMealPlan: false,
-  isLoadingSavedRecipes: false,
-  isLoadingRatings: false,
-  isLoadingHousehold: false,
-  setLoadingRatingsComplete: () => {},
-  consumptionSuggestions: [],
-  expirationAlerts: [],
-  recipeSuggestions: [],
-  recentActivities: [],
-  isLoadingActivities: false,
-};
-
+/**
+ * Fans a single combined AppContextValue out into the domain-scoped
+ * providers. When `value` is omitted, each scoped provider falls back to
+ * its own inert default (used only in tests/storybook-style rendering).
+ */
 export const AppProvider: React.FC<AppProviderProps> = ({ children, value }) => {
-  const providerValue = value ?? defaultAppContextValue;
+  if (!value) {
+    return (
+      <NavigationProvider>
+        <UserProvider>
+          <InventoryProvider>
+            <ShoppingProvider>
+              <MealPlanProvider>
+                <RecipeProvider>
+                  <SettingsDataProvider>
+                    {children}
+                  </SettingsDataProvider>
+                </RecipeProvider>
+              </MealPlanProvider>
+            </ShoppingProvider>
+          </InventoryProvider>
+        </UserProvider>
+      </NavigationProvider>
+    );
+  }
 
   return (
-    <AppContext.Provider value={providerValue}>
-      {children}
-    </AppContext.Provider>
+    <NavigationProvider value={{
+      activeTab: value.activeTab,
+      setActiveTab: value.setActiveTab,
+      activeSettingsCategory: value.activeSettingsCategory,
+    }}>
+      <UserProvider value={{
+        user: value.user,
+        household: value.household,
+        isLoadingHousehold: value.isLoadingHousehold,
+        recentActivities: value.recentActivities,
+        isLoadingActivities: value.isLoadingActivities,
+      }}>
+        <InventoryProvider value={{
+          inventory: value.inventory,
+          setInventory: value.setInventory,
+          isLoadingInventory: value.isLoadingInventory,
+          consumptionSuggestions: value.consumptionSuggestions,
+          expirationAlerts: value.expirationAlerts,
+          recipeSuggestions: value.recipeSuggestions,
+        }}>
+          <ShoppingProvider value={{
+            shoppingList: value.shoppingList,
+            setShoppingList: value.setShoppingList,
+            isLoadingShoppingList: value.isLoadingShoppingList,
+          }}>
+            <MealPlanProvider value={{
+              mealPlan: value.mealPlan,
+              setMealPlan: value.setMealPlan,
+              isLoadingMealPlan: value.isLoadingMealPlan,
+            }}>
+              <RecipeProvider value={{
+                savedRecipes: value.savedRecipes,
+                ratings: value.ratings,
+                persistedRecipeResult: value.persistedRecipeResult,
+                setPersistedRecipeResult: value.setPersistedRecipeResult,
+                initialSearchQuery: value.initialSearchQuery,
+                setInitialSearchQuery: value.setInitialSearchQuery,
+                isLoadingSavedRecipes: value.isLoadingSavedRecipes,
+                isLoadingRatings: value.isLoadingRatings,
+                setLoadingRatingsComplete: value.setLoadingRatingsComplete,
+                recipeSaveLimitExceeded: value.recipeSaveLimitExceeded,
+                mealPlanLimitExceeded: value.mealPlanLimitExceeded,
+              }}>
+                <SettingsDataProvider value={{
+                  settings: value.settings,
+                  setSettings: value.setSettings,
+                  customCategories: value.customCategories,
+                }}>
+                  {children}
+                </SettingsDataProvider>
+              </RecipeProvider>
+            </MealPlanProvider>
+          </ShoppingProvider>
+        </InventoryProvider>
+      </UserProvider>
+    </NavigationProvider>
   );
 };
 
+/**
+ * Back-compat hook — recombines all domain-scoped contexts into the old
+ * monolithic shape. Subscribes to every domain context, so a component using
+ * this still re-renders on any field change, same as before the split.
+ * Prefer the scoped hooks (useInventoryContext, useShoppingContext,
+ * useMealPlanContext, useRecipeContext, useUserContext,
+ * useSettingsDataContext, useNavigation) in new/updated code.
+ */
 export const useApp = (): AppContextValue => {
-  const context = useContext(AppContext);
-  if (context === undefined) {
-    throw new Error('useApp must be used within an AppProvider');
-  }
-  return context;
+  const navigation = useNavigation();
+  const user = useUserContext();
+  const inventoryCtx = useInventoryContext();
+  const shopping = useShoppingContext();
+  const mealPlanCtx = useMealPlanContext();
+  const recipe = useRecipeContext();
+  const settingsData = useSettingsDataContext();
+
+  return {
+    ...navigation,
+    ...user,
+    ...inventoryCtx,
+    ...shopping,
+    ...mealPlanCtx,
+    ...recipe,
+    ...settingsData,
+  };
 };
 
-export default AppContext;

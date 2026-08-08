@@ -66,6 +66,83 @@ vi.mock('../../../hooks/useKeyboardNavigation', () => ({
   })),
 }));
 
+// RecipeFinder reads its state from domain-scoped contexts rather than props.
+// mockState is mutated per-test (see resetMockState / overrides below) and read
+// lazily inside each mocked hook so per-test overrides take effect.
+const mockState = {
+  onAddToPlan: vi.fn(),
+  onSaveRecipe: vi.fn(),
+  onDeleteRecipe: vi.fn(),
+  onMarkAsMade: vi.fn(),
+  inventory: [] as PantryItem[],
+  ratings: [] as RecipeRating[],
+  onRate: vi.fn(),
+  savedRecipes: [] as SavedRecipe[],
+  user: {} as User,
+  setActiveTab: vi.fn(),
+  persistedResult: null as RecipeSearchResult | null,
+  setPersistedResult: vi.fn(),
+  initialSearchQuery: '',
+  addToast: vi.fn(),
+  recipeSaveLimitExceeded: false,
+  mealPlanLimitExceeded: false,
+  isLoadingSavedRecipes: false,
+  household: null as Household | null,
+  recipeSuggestions: [] as import('../../../types').RecipeSuggestion[],
+  onDeleteItem: vi.fn(),
+};
+
+vi.mock('../../../contexts/NavigationContext', () => ({
+  useNavigation: () => ({ setActiveTab: mockState.setActiveTab, activeTab: 'recipes', activeSettingsCategory: null }),
+}));
+vi.mock('../../../contexts/UserContext', () => ({
+  useUserContext: () => ({
+    user: mockState.user,
+    household: mockState.household,
+    isLoadingHousehold: false,
+    recentActivities: [],
+    isLoadingActivities: false,
+  }),
+}));
+vi.mock('../../../contexts/InventoryContext', () => ({
+  useInventoryContext: () => ({
+    inventory: mockState.inventory,
+    setInventory: vi.fn(),
+    isLoadingInventory: false,
+    consumptionSuggestions: [],
+    expirationAlerts: [],
+    recipeSuggestions: mockState.recipeSuggestions,
+  }),
+}));
+vi.mock('../../../contexts/RecipeContext', () => ({
+  useRecipeContext: () => ({
+    savedRecipes: mockState.savedRecipes,
+    ratings: mockState.ratings,
+    persistedRecipeResult: mockState.persistedResult,
+    setPersistedRecipeResult: mockState.setPersistedResult,
+    initialSearchQuery: mockState.initialSearchQuery,
+    setInitialSearchQuery: vi.fn(),
+    isLoadingSavedRecipes: mockState.isLoadingSavedRecipes,
+    isLoadingRatings: false,
+    setLoadingRatingsComplete: vi.fn(),
+    recipeSaveLimitExceeded: mockState.recipeSaveLimitExceeded,
+    mealPlanLimitExceeded: mockState.mealPlanLimitExceeded,
+  }),
+}));
+vi.mock('../../../contexts/AppActionsContext', () => ({
+  useAppActions: () => ({
+    setActiveSettingsCategory: vi.fn(),
+    setActiveTab: mockState.setActiveTab,
+    addToast: mockState.addToast,
+    onAddToPlan: mockState.onAddToPlan,
+    onSaveRecipe: mockState.onSaveRecipe,
+    onDeleteRecipe: mockState.onDeleteRecipe,
+    handleMarkAsMade: mockState.onMarkAsMade,
+    onRateRecipe: mockState.onRate,
+    deleteItem: mockState.onDeleteItem,
+  }),
+}));
+
 // Mock child components
 vi.mock('../../../components/ui/SkeletonLoader', () => ({
   RecipeCardSkeleton: () => <div data-testid="recipe-card-skeleton">Loading...</div>,
@@ -118,30 +195,33 @@ const mockInventory: PantryItem[] = [
 const mockRatings: RecipeRating[] = [];
 const mockSavedRecipes: SavedRecipe[] = [];
 
-const defaultProps = {
-  onAddToPlan: vi.fn(),
-  onSaveRecipe: vi.fn(),
-  onDeleteRecipe: vi.fn(),
-  onMarkAsMade: vi.fn(),
-  inventory: mockInventory,
-  ratings: mockRatings,
-  onRate: vi.fn(),
-  savedRecipes: mockSavedRecipes,
-  user: mockUser,
-  setActiveTab: vi.fn(),
-  persistedResult: null,
-  setPersistedResult: vi.fn(),
-  initialSearchQuery: '',
-  addToast: vi.fn(),
-  recipeSaveLimitExceeded: false,
-  mealPlanLimitExceeded: false,
-  isLoadingSavedRecipes: false,
-  household: null as Household | null,
-};
+function resetMockState() {
+  mockState.onAddToPlan = vi.fn();
+  mockState.onSaveRecipe = vi.fn();
+  mockState.onDeleteRecipe = vi.fn();
+  mockState.onMarkAsMade = vi.fn();
+  mockState.inventory = mockInventory;
+  mockState.ratings = mockRatings;
+  mockState.onRate = vi.fn();
+  mockState.savedRecipes = mockSavedRecipes;
+  mockState.user = mockUser;
+  mockState.setActiveTab = vi.fn();
+  mockState.persistedResult = null;
+  mockState.setPersistedResult = vi.fn();
+  mockState.initialSearchQuery = '';
+  mockState.addToast = vi.fn();
+  mockState.recipeSaveLimitExceeded = false;
+  mockState.mealPlanLimitExceeded = false;
+  mockState.isLoadingSavedRecipes = false;
+  mockState.household = null;
+  mockState.recipeSuggestions = [];
+  mockState.onDeleteItem = vi.fn();
+}
 
 describe('RecipeFinder', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    resetMockState();
   });
 
   afterEach(() => {
@@ -149,7 +229,7 @@ describe('RecipeFinder', () => {
   });
 
   test('renders search input and basic UI elements', () => {
-    render(<RecipeFinder {...defaultProps} />);
+    render(<RecipeFinder />);
 
     const searchInput = screen.getByTestId('recipefinder-search-input');
     expect(searchInput).toBeInTheDocument();
@@ -158,8 +238,8 @@ describe('RecipeFinder', () => {
   });
 
   test('displays initial search query when provided', () => {
-    const props = { ...defaultProps, initialSearchQuery: 'chicken stir fry' };
-    render(<RecipeFinder {...props} />);
+    mockState.initialSearchQuery = 'chicken stir fry';
+    render(<RecipeFinder />);
 
     const searchInput = screen.getByTestId('recipefinder-search-input');
     expect(searchInput).toBeInTheDocument();
@@ -170,7 +250,7 @@ describe('RecipeFinder', () => {
     const { searchRecipes } = await import('../../../services/geminiService');
     vi.mocked(searchRecipes).mockImplementation(() => new Promise(() => {}));
 
-    render(<RecipeFinder {...defaultProps} />);
+    render(<RecipeFinder />);
 
     const searchInput = screen.getByTestId('recipefinder-search-input');
     const searchButton = screen.getAllByTestId('recipefinder-search-button')[0];
@@ -218,8 +298,8 @@ describe('RecipeFinder', () => {
     vi.mocked(searchRecipes).mockResolvedValue(mockSearchResult);
 
     // Render component with persistedResult to directly verify rendering of results
-    const props = { ...defaultProps, persistedResult: mockSearchResult };
-    render(<RecipeFinder {...props} />);
+    mockState.persistedResult = mockSearchResult;
+    render(<RecipeFinder />);
 
     await waitFor(() => {
       expect(screen.getByRole('heading', { name: 'Test Chicken Recipe' })).toBeInTheDocument();
@@ -258,9 +338,10 @@ describe('RecipeFinder', () => {
 
     // Render component with persistedResult to directly verify modal opens for a result
     const mockOnSaveRecipe = vi.fn();
-    const props = { ...defaultProps, onSaveRecipe: mockOnSaveRecipe, persistedResult: mockSearchResult };
+    mockState.onSaveRecipe = mockOnSaveRecipe;
+    mockState.persistedResult = mockSearchResult;
 
-    render(<RecipeFinder {...props} />);
+    render(<RecipeFinder />);
 
     // Click on the recipe to open modal
     const recipeCard = await screen.findByRole('heading', { name: 'Test Recipe' });
@@ -271,8 +352,8 @@ describe('RecipeFinder', () => {
   });
 
   test('renders with recipe save limit exceeded prop', () => {
-    const props = { ...defaultProps, recipeSaveLimitExceeded: true };
-    render(<RecipeFinder {...props} />);
+    mockState.recipeSaveLimitExceeded = true;
+    render(<RecipeFinder />);
 
     // Component should render without errors — ensure at least one main landmark exists
     const mains = screen.getAllByRole('main');
@@ -295,7 +376,7 @@ describe('RecipeFinder', () => {
     const { searchRecipes } = await import('../../../services/geminiService');
     vi.mocked(getCachedRecipesCache).mockResolvedValue([mockRecipe]);
 
-    render(<RecipeFinder {...defaultProps} />);
+    render(<RecipeFinder />);
 
     // Trigger the meal filter in the popular section
     const dinnerFilterBtn = screen.getByRole('button', { name: /dinner/i });

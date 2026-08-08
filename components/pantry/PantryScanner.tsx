@@ -2,7 +2,7 @@ import React, { useState, useRef, useCallback, useEffect, useMemo } from 'react'
 import { useModalOpen } from '../../utils/useModalOpen';
 import { useAndroidBack } from '../../hooks/useAndroidBack';
 import { Camera, Plus, ChefHat, FilePlus, CheckSquare } from 'lucide-react';
-import { PantryItem, LoadingState, ExpirationAlert, CustomCategory, PantryFilter, User, ShoppingItem, StructuredRecipe, SavedRecipe, ConsumptionSuggestion, RecipeSuggestion } from '../../types';
+import { PantryItem, LoadingState, PantryFilter, StructuredRecipe, SavedRecipe } from '../../types';
 
 import { Tab } from '../../types/app';
 import AnalyticsService from '../../services/analyticsService';
@@ -12,7 +12,12 @@ import ItemDetailModal from './ItemDetailModal';
 import { PantryItemSkeleton } from '../ui/SkeletonLoader';
 import { generateIntelligentRecipeQuery, savePantryFilter, defaultPantryFilter, RecipeIngredientMatch, getMealPrepSuggestions } from '../../utils/searchUtils';
 import { PantryService } from '../../services/pantryService';
-import { useApp } from '../../contexts/AppContext';
+import { useNavigation } from '../../contexts/NavigationContext';
+import { useUserContext } from '../../contexts/UserContext';
+import { useInventoryContext } from '../../contexts/InventoryContext';
+import { useRecipeContext } from '../../contexts/RecipeContext';
+import { useSettingsDataContext } from '../../contexts/SettingsDataContext';
+import { useMealPlanContext } from '../../contexts/MealPlanContext';
 import { useAppActions } from '../../contexts/AppActionsContext';
 import { useConfirm } from '../ui/ConfirmDialog';
 import RecipeModal from '../recipes-meals/RecipeModal';
@@ -40,47 +45,26 @@ import { PantryBulkActionBar } from './PantryBulkActionBar';
 import { PantrySearchBar } from './PantrySearchBar';
 import StorageLocationIndicator from './StorageLocationIndicator';
 
-interface PantryScannerProps {
-  inventory: PantryItem[];
-  isLoadingInventory?: boolean;
-  addToShoppingList: (items: string[]) => void;
-  addShoppingListItem?: (item: Omit<ShoppingItem, 'id'>) => void;
-  onDeleteItem: (index: number) => Promise<void>;
-  onAddItem: (item: PantryItem) => Promise<void>;
-  onAddItems: (items: PantryItem[]) => Promise<void>;
-  onUpdateItem: (index: number, updates: Partial<PantryItem>) => Promise<void>;
-  consumptionSuggestions?: ConsumptionSuggestion[];
-  expirationAlerts?: ExpirationAlert[];
-  recipeSuggestions?: RecipeSuggestion[];
-  customCategories?: CustomCategory[];
-  setActiveTab?: (tab: Tab) => void;
-  setInitialSearchQuery?: (query: string) => void;
-  user?: User | null;
-}
-
-const PantryScannerComponent: React.FC<PantryScannerProps> = ({
-  inventory,
-  isLoadingInventory = false,
-  addToShoppingList,
-  addShoppingListItem: _addShoppingListItem,
-  onDeleteItem,
-  onAddItem: _onAddItem,
-  onAddItems: _onAddItems,
-  onUpdateItem,
-  consumptionSuggestions: _consumptionSuggestions = [],
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  expirationAlerts = [],
-  recipeSuggestions: _recipeSuggestions = [],
-  customCategories = [],
-  setActiveTab,
-  setInitialSearchQuery,
-  user
-}) => {
-  const appState = useApp();
+const PantryScannerComponent: React.FC = () => {
+  const { setActiveTab } = useNavigation();
+  const { user } = useUserContext();
+  const { inventory, isLoadingInventory = false, consumptionSuggestions: _consumptionSuggestions = [], expirationAlerts: _expirationAlerts = [], recipeSuggestions: _recipeSuggestions = [] } = useInventoryContext();
+  const { savedRecipes, recipeSaveLimitExceeded, setInitialSearchQuery } = useRecipeContext();
+  const { settings, customCategories = [] } = useSettingsDataContext();
+  const { mealPlan } = useMealPlanContext();
   const appActions = useAppActions();
   const confirm = useConfirm();
-  const { household, savedRecipes, recipeSaveLimitExceeded, settings, mealPlan } = appState;
-  const { onSaveRecipe, onRateRecipe } = appActions;
+  const { household } = useUserContext();
+  const {
+    onSaveRecipe,
+    onRateRecipe,
+    onAddToShoppingList: addToShoppingList,
+    addShoppingListItem: _addShoppingListItem,
+    deleteItem: onDeleteItem,
+    addItem: _onAddItem,
+    addItems: _onAddItems,
+    updateItem: onUpdateItem,
+  } = appActions;
 
   const [canShowAdBanner, setCanShowAdBanner] = React.useState<boolean>(false);
 
@@ -109,6 +93,8 @@ const PantryScannerComponent: React.FC<PantryScannerProps> = ({
     collapseAllCategories: _collapseAllCategories,
   } = usePantryFilterSort(inventory);
 
+  const userId = user?.id;
+  const userTier = user?.subscription?.tier;
   useEffect(() => {
     let mounted = true;
     if (!user) {
@@ -121,7 +107,7 @@ const PantryScannerComponent: React.FC<PantryScannerProps> = ({
       if (mounted) setCanShowAdBanner(false);
     });
     return () => { mounted = false; };
-  }, [user]);
+  }, [userId, userTier]);
 
   const importedTimerRef = useRef<number | null>(null);
   useEffect(() => {

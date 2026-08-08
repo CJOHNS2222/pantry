@@ -1,7 +1,7 @@
 import React from 'react';
 import { ShoppingBasket } from 'lucide-react';
-import { DayPlan, MealPlanItem, PantryItem } from '../../types';
-import { GroceryCostEstimator } from '../shopping-list/GroceryCostEstimator';
+import { DayPlan, MealPlanItem } from '../../types';
+import { GroceryCostEstimator, MissingIngredient } from '../shopping-list/GroceryCostEstimator';
 import { MealPlannerHighlightsSection } from './MealPlannerHighlightsSection';
 import { MealPlannerCalendarSection } from './MealPlannerCalendarSection';
 import { CurrentDayMealsSection } from './CurrentDayMealsSection';
@@ -16,7 +16,7 @@ interface MealPlannerPremiumContentProps {
   isEstimatorOpen: boolean;
   showPriceData: boolean;
   mealPlan: DayPlan[];
-  inventory: PantryItem[];
+  missingIngredients: MissingIngredient[];
   freeItemLimit?: number;
   onEstimatorToggle: (isOpen: boolean) => void;
   todaysMeals: MealPlanItem[];
@@ -72,7 +72,7 @@ export const MealPlannerPremiumContent: React.FC<MealPlannerPremiumContentProps>
   isEstimatorOpen,
   showPriceData,
   mealPlan,
-  inventory,
+  missingIngredients,
   freeItemLimit,
   onEstimatorToggle,
   todaysMeals,
@@ -138,8 +138,7 @@ export const MealPlannerPremiumContent: React.FC<MealPlannerPremiumContentProps>
         <div className={`flex gap-4 mb-3 ${isEstimatorOpen ? 'flex-col' : ''}`}>
           <div className={isEstimatorOpen ? 'w-full' : 'flex-1'}>
             <GroceryCostEstimator
-              mealPlan={mealPlan}
-              inventory={inventory}
+              missingIngredients={missingIngredients}
               onEstimatorToggle={onEstimatorToggle}
               freeItemLimit={freeItemLimit}
             />

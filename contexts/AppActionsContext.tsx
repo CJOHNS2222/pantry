@@ -20,7 +20,7 @@ interface AppActionsContextValue {
   updateMealPlan: (mealPlan: DayPlan[]) => void;
 
   // Recipe operations
-  onAddToPlan: (recipe: StructuredRecipe) => void;
+  onAddToPlan: (recipe: StructuredRecipe, dayIndex?: number, mealType?: 'breakfast' | 'lunch' | 'dinner') => void;
   onSaveRecipe: (recipe: StructuredRecipe) => void;
   onDeleteRecipe: (recipe: SavedRecipe) => void;
   onRateRecipe: (rating: RecipeRatingInput) => void;
@@ -28,7 +28,7 @@ interface AppActionsContextValue {
 
   // Shopping list operations
   onMoveToPantry: (items: ShoppingItem[]) => void;
-  onAddToShoppingList: (items: (string | { item: string; source: string; notes?: string })[]) => Promise<void>;
+  onAddToShoppingList: (items: (string | { item: string; source: string; notes?: string })[], defaultSource?: string) => Promise<void>;
   addShoppingListItem: (item: Omit<ShoppingItem, 'id'>) => void;
 
   // Settings operations

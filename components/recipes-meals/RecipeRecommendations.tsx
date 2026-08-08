@@ -3,7 +3,7 @@ import React, { useState, useEffect, useContext } from 'react';
 import { Heart, Users, TrendingUp, Clock, ChefHat, Star, Loader2 } from 'lucide-react';
 import { StructuredRecipe } from '../../types';
 import { RecipeRecommendationService, RecipeRecommendation } from '../../services/recipeRecommendationService';
-import AppContext from '../../contexts/AppContext';
+import UserContext from '../../contexts/UserContext';
 import { useToast } from '../ui/Toast';
 import { log } from '../../services/logService';
 
@@ -20,7 +20,7 @@ export const RecipeRecommendations: React.FC<RecipeRecommendationsProps> = ({
   onRecipeSelect,
   onDismissRecommendation
 }) => {
-  const context = useContext(AppContext);
+  const context = useContext(UserContext);
   const user = context?.user;
   const toast = useToast();
   const [recommendations, setRecommendations] = useState<RecipeRecommendation[]>([]);

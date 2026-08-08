@@ -3,7 +3,7 @@ import { Users, TrendingUp, ChefHat, MessageSquare, Loader2, ThumbsUp } from 'lu
 import { RecipeCommunityStats, RecipeModification, RecipeRating } from '../../types';
 import { RecipeRatingService } from '../../services/recipeRatingService';
 import DatabaseMonitoringService from '../../services/databaseMonitoringService';
-import AppContext from '../../contexts/AppContext';
+import UserContext from '../../contexts/UserContext';
 import { useToast } from '../ui/Toast';
 import { log } from '../../services/logService';
 
@@ -16,7 +16,7 @@ export const RecipeCommunityInsights: React.FC<RecipeCommunityInsightsProps> = (
   recipeTitle,
   householdId
 }) => {
-  const context = useContext(AppContext);
+  const context = useContext(UserContext);
   const user = context?.user;
   const toast = useToast();
   const [stats, setStats] = useState<RecipeCommunityStats | null>(null);

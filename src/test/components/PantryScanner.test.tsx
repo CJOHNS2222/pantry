@@ -1,7 +1,112 @@
+import React from 'react';
 import { describe, it, test, expect, vi, beforeEach, afterEach } from 'vitest';
-import { render, screen, fireEvent, cleanup } from '../test-utils';
+import { render as rtlRender, screen, fireEvent, cleanup } from '@testing-library/react';
 import { PantryScanner } from '../../../components/pantry/PantryScanner';
 import { PantryItem } from '../../../types';
+import { ConfirmDialogProvider } from '../../../components/ui/ConfirmDialog';
+
+vi.useFakeTimers({ toFake: ['setInterval', 'clearInterval'] });
+
+// PantryScanner's bulk-edit modal (BulkQuantityEditModal) uses react-intl's useIntl(),
+// which requires an <IntlProvider> ancestor. Mock the module instead of wrapping with
+// a real provider, matching the pattern used in the sibling MealPlanner/RecipeFinder tests.
+vi.mock('react-intl', () => ({
+  useIntl: () => ({
+    formatMessage: ({ defaultMessage, id }: { defaultMessage?: string; id: string }) => defaultMessage || id,
+  }),
+  FormattedMessage: ({ id }: { id: string }) => <span>{id}</span>,
+}));
+
+// PantryScanner calls useConfirm() internally, which requires a ConfirmDialogProvider
+// ancestor. We can't use the shared test-utils `render` here because it also wraps with
+// the real AppActionsProvider, which conflicts with this file's own
+// vi.mock('../../../contexts/AppActionsContext', ...) below. So wrap with just the
+// ConfirmDialogProvider directly.
+function render(ui: React.ReactElement) {
+  return rtlRender(ui, { wrapper: ConfirmDialogProvider });
+}
+
+// PantryScanner reads inventory/actions from domain-scoped contexts rather than
+// props. Mock those modules so each test can inject its own inventory/callbacks
+// without threading them through props.
+let mockInventoryState: PantryItem[] = [];
+const mockAddToShoppingList = vi.fn();
+const mockOnDeleteItem = vi.fn();
+const mockOnAddItem = vi.fn();
+const mockOnAddItems = vi.fn();
+const mockOnUpdateItem = vi.fn();
+
+const mockUser = { id: 'user1', profile: {} };
+const mockEmptyArray: any[] = [];
+const mockSettings = { shopping: {} };
+const mockNavContext = { setActiveTab: vi.fn(), activeTab: 'pantry', activeSettingsCategory: null };
+const mockUserContextValue = {
+  user: mockUser,
+  household: undefined,
+  isLoadingHousehold: false,
+  recentActivities: mockEmptyArray,
+  isLoadingActivities: false,
+};
+const mockRecipeContextValue = {
+  savedRecipes: mockEmptyArray,
+  ratings: mockEmptyArray,
+  persistedRecipeResult: null,
+  setPersistedRecipeResult: vi.fn(),
+  initialSearchQuery: '',
+  setInitialSearchQuery: vi.fn(),
+  isLoadingSavedRecipes: false,
+  isLoadingRatings: false,
+  setLoadingRatingsComplete: vi.fn(),
+  recipeSaveLimitExceeded: false,
+  mealPlanLimitExceeded: false,
+};
+const mockSettingsContextValue = { settings: mockSettings, setSettings: vi.fn(), customCategories: mockEmptyArray };
+const mockMealPlanContextValue = { mealPlan: mockEmptyArray, setMealPlan: vi.fn(), isLoadingMealPlan: false };
+const mockShoppingContextValue = { shoppingList: mockEmptyArray, setShoppingList: vi.fn(), isLoadingShoppingList: false };
+const mockAppActionsValue = {
+  onSaveRecipe: vi.fn(),
+  onRateRecipe: vi.fn(),
+  onAddToShoppingList: mockAddToShoppingList,
+  addShoppingListItem: vi.fn(),
+  deleteItem: mockOnDeleteItem,
+  addItem: mockOnAddItem,
+  addItems: mockOnAddItems,
+  updateItem: mockOnUpdateItem,
+  addToast: vi.fn(),
+  deleteItems: vi.fn(),
+};
+
+vi.mock('../../../contexts/NavigationContext', () => ({
+  useNavigation: () => mockNavContext,
+}));
+vi.mock('../../../contexts/UserContext', () => ({
+  useUserContext: () => mockUserContextValue,
+}));
+vi.mock('../../../contexts/InventoryContext', () => ({
+  useInventoryContext: () => ({
+    inventory: mockInventoryState,
+    setInventory: vi.fn(),
+    isLoadingInventory: false,
+    consumptionSuggestions: mockEmptyArray,
+    expirationAlerts: mockEmptyArray,
+    recipeSuggestions: mockEmptyArray,
+  }),
+}));
+vi.mock('../../../contexts/RecipeContext', () => ({
+  useRecipeContext: () => mockRecipeContextValue,
+}));
+vi.mock('../../../contexts/SettingsDataContext', () => ({
+  useSettingsDataContext: () => mockSettingsContextValue,
+}));
+vi.mock('../../../contexts/MealPlanContext', () => ({
+  useMealPlanContext: () => mockMealPlanContextValue,
+}));
+vi.mock('../../../contexts/ShoppingContext', () => ({
+  useShoppingContext: () => mockShoppingContextValue,
+}));
+vi.mock('../../../contexts/AppActionsContext', () => ({
+  useAppActions: () => mockAppActionsValue,
+}));
 
 // Mock Capacitor Camera
 vi.mock('@capacitor/camera', () => ({
@@ -20,6 +125,13 @@ vi.mock('@capacitor/camera', () => ({
 vi.mock('../../../services/geminiService', () => ({
   analyzePantryImage: vi.fn(),
 }));
+
+vi.mock('../../../components/pantry/AddItemsModal', () => ({ AddItemsModal: () => null }));
+vi.mock('../../../components/pantry/PantryImportModal', () => ({ default: () => null }));
+vi.mock('../../../components/pantry/FreezeTransitionModal', () => ({ default: () => null }));
+vi.mock('../../../components/pantry/ScanReviewModal', () => ({ ScanReviewModal: () => null }));
+vi.mock('../../../components/ui/AdMobBanner', () => ({ AdMobBanner: () => null }));
+vi.mock('../../../components/pantry/PantryHealthScore', () => ({ PantryHealthScore: () => null }));
 
 // Mock IntersectionObserver for JSDOM
 beforeEach(() => {
@@ -52,44 +164,22 @@ function makeItem(i: number): PantryItem {
 }
 
 describe('PantryScanner Component', () => {
-  const mockAddToShoppingList = vi.fn();
-  const mockOnDeleteItem = vi.fn();
-  const mockOnAddItem = vi.fn();
-  const mockOnAddItems = vi.fn();
-  const mockOnUpdateItem = vi.fn();
-
   const initialInventory: PantryItem[] = [
     { id: '1', item: 'Milk', category: '', quantity_estimate: '2' } as PantryItem,
     { id: '2', item: 'Bread', category: '', quantity_estimate: '1' } as PantryItem,
   ];
 
   it('renders with initial inventory', () => {
-    render(
-      <PantryScanner
-        inventory={initialInventory}
-        addToShoppingList={mockAddToShoppingList}
-        onDeleteItem={mockOnDeleteItem}
-        onAddItem={mockOnAddItem}
-        onAddItems={mockOnAddItems}
-        onUpdateItem={mockOnUpdateItem}
-      />
-    );
+    mockInventoryState = initialInventory;
+    render(<PantryScanner />);
 
     expect(screen.getAllByText('Milk')[0]).toBeInTheDocument();
     expect(screen.getAllByText('Bread')[0]).toBeInTheDocument();
   });
 
   it('renders the search input placeholder', () => {
-    render(
-      <PantryScanner
-        inventory={initialInventory}
-        addToShoppingList={mockAddToShoppingList}
-        onDeleteItem={mockOnDeleteItem}
-        onAddItem={mockOnAddItem}
-        onAddItems={mockOnAddItems}
-        onUpdateItem={mockOnUpdateItem}
-      />
-    );
+    mockInventoryState = initialInventory;
+    render(<PantryScanner />);
 
     const searchButton = screen.getByText('Search pantry items...').closest('button')!;
     fireEvent.click(searchButton);
@@ -98,16 +188,8 @@ describe('PantryScanner Component', () => {
   });
 
   it('shows the scan prompt', () => {
-    render(
-      <PantryScanner
-        inventory={[]} // Empty inventory to show scan prompt
-        addToShoppingList={mockAddToShoppingList}
-        onDeleteItem={mockOnDeleteItem}
-        onAddItem={mockOnAddItem}
-        onAddItems={mockOnAddItems}
-        onUpdateItem={mockOnUpdateItem}
-      />
-    );
+    mockInventoryState = []; // Empty inventory to show scan prompt
+    render(<PantryScanner />);
 
     // Open search modal
     const searchButton = screen.getByText('Search pantry items...').closest('button')!;
@@ -118,25 +200,10 @@ describe('PantryScanner Component', () => {
 });
 
 describe('PantryScanner bulk behavior and virtualization', () => {
-  const addToShoppingList = vi.fn();
-  const mockOnDeleteItem = vi.fn();
-  const mockOnAddItem = vi.fn();
-  const mockOnAddItems = vi.fn();
-  const mockOnUpdateItem = vi.fn();
-
   test('bulk change location calls setInventory with updated items', async () => {
-    const inventory = [makeItem(1), makeItem(2), makeItem(3)];
+    mockInventoryState = [makeItem(1), makeItem(2), makeItem(3)];
 
-    render(
-      <PantryScanner
-        inventory={inventory}
-        addToShoppingList={addToShoppingList}
-        onDeleteItem={mockOnDeleteItem}
-        onAddItem={mockOnAddItem}
-        onAddItems={mockOnAddItems}
-        onUpdateItem={mockOnUpdateItem}
-      />
-    );
+    render(<PantryScanner />);
 
     // Click Bulk select mode button
     const selectBtn = screen.getByLabelText('Bulk select mode');
@@ -155,18 +222,9 @@ describe('PantryScanner bulk behavior and virtualization', () => {
   });
 
   test('virtualized render does not crash with many items', () => {
-    const many = Array.from({ length: 120 }).map((_, i) => makeItem(i));
+    mockInventoryState = Array.from({ length: 120 }).map((_, i) => makeItem(i));
 
-    render(
-      <PantryScanner
-        inventory={many}
-        addToShoppingList={addToShoppingList}
-        onDeleteItem={mockOnDeleteItem}
-        onAddItem={mockOnAddItem}
-        onAddItems={mockOnAddItems}
-        onUpdateItem={mockOnUpdateItem}
-      />
-    );
+    render(<PantryScanner />);
 
     const matches = screen.getAllByText(/Item 0|Item 1/);
     expect(matches.length).toBeGreaterThan(0);

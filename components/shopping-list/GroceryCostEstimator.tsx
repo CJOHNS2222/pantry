@@ -1,19 +1,25 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { DollarSign, Calculator, TrendingUp, Users, RefreshCw } from 'lucide-react';
-import { DayPlan, PantryItem, ShoppingItem } from '../../types';
+import { ShoppingItem } from '../../types';
 import { Tab } from '../../types/app';
 import { groceryPriceService, PriceData } from '../../services/groceryPriceService';
 import { formatCurrency } from '../../services/currencyService';
-import { parseIngredientForShoppingList, consolidateShoppingList, convertQuantity } from '../../utils/appUtils';
+import { parseIngredientForShoppingList, consolidateShoppingList } from '../../utils/appUtils';
 import { useAppActions } from '../../contexts/AppActionsContext';
 import { useApp } from '../../contexts/AppContext';
 import { log } from '../../services/logService';
 import AnalyticsService from '../../services/analyticsService';
 import { PaywallPrompt } from '../ui/PaywallPrompt';
 
+export interface MissingIngredient {
+  ingredient: string;
+  structuredName?: string;
+  recipeName: string;
+  recipeId?: string;
+}
+
 interface GroceryCostEstimatorProps {
-  mealPlan: DayPlan[];
-  inventory: PantryItem[];
+  missingIngredients: MissingIngredient[];
   onEstimatorToggle?: (isOpen: boolean) => void;
   freeItemLimit?: number;
 }
@@ -26,7 +32,22 @@ interface IngredientCost {
   source: 'estimated' | 'known';
 }
 
-export const GroceryCostEstimator: React.FC<GroceryCostEstimatorProps> = ({ mealPlan, inventory, onEstimatorToggle, freeItemLimit }) => {
+// Mirrors ShoppingList.tsx's estimateItemPrice: price is the item's average
+// per-unit price times the raw parsed quantity (no unit conversion). Default
+// prices in groceryPriceService are quoted per whatever unit is customary for
+// that item (e.g. per lb, per dozen, per bottle) and recipe quantities are
+// treated as that many of that unit — same assumption the shopping list's
+// own cost tracking already makes, so totals here agree with it.
+function parseQuantity(quantity?: number | string): number {
+  if (typeof quantity === 'number') return quantity;
+  if (typeof quantity === 'string') {
+    const parsed = parseFloat(quantity);
+    if (!isNaN(parsed)) return parsed;
+  }
+  return 1;
+}
+
+export const GroceryCostEstimator: React.FC<GroceryCostEstimatorProps> = ({ missingIngredients, onEstimatorToggle, freeItemLimit }) => {
   const { addToast, setActiveTab, setActiveSettingsCategory } = useAppActions();
   const { user } = useApp();
   const [showEstimator, setShowEstimator] = useState(false);
@@ -35,46 +56,58 @@ export const GroceryCostEstimator: React.FC<GroceryCostEstimatorProps> = ({ meal
   const [loadingPrices, setLoadingPrices] = useState(false);
   const [showPriceInput, setShowPriceInput] = useState<string | null>(null);
   const [userPriceInputs, setUserPriceInputs] = useState<Record<string, { price: string; unit: string; store: string }>>({});
-  const [includeAllIngredients, setIncludeAllIngredients] = useState(false);
 
   const toggleEstimator = (isOpen: boolean) => {
     setShowEstimator(isOpen);
     onEstimatorToggle?.(isOpen);
-    
+
     if (isOpen) {
-      AnalyticsService.trackEvent('grocery_cost_estimator_opened', { mealPlanLength: mealPlan.length });
+      AnalyticsService.trackEvent('grocery_cost_estimator_opened', { mealPlanLength: missingIngredients.length });
     }
   };
 
-  // Fetch current prices when component mounts or meal plan changes
+  // Consolidate missing ingredients the same way the shopping list consolidates
+  // its own items, so duplicate ingredients across recipes are merged instead
+  // of priced (and counted) once per recipe occurrence.
+  const consolidated = useMemo(() => {
+    const tempShoppingItems: ShoppingItem[] = missingIngredients.map((entry, idx) => {
+      const parsed = parseIngredientForShoppingList(entry.ingredient);
+      const name = entry.structuredName || parsed.itemName;
+      return {
+        id: `temp-${idx}`,
+        item: name,
+        quantity: parsed.quantity,
+        category: '',
+        checked: false
+      };
+    });
+
+    return consolidateShoppingList(tempShoppingItems);
+  }, [missingIngredients]);
+
+  const getIngredientKey = (name: string): string => name.toLowerCase().trim();
+
+  // Fetch current prices when the estimator opens or the ingredient set changes
   useEffect(() => {
     if (showEstimator) {
       fetchCurrentPrices();
     }
-  }, [showEstimator, mealPlan]);
+  }, [showEstimator, consolidated]);
 
   const fetchCurrentPrices = async () => {
     setLoadingPrices(true);
     try {
-      // Get all unique ingredients from meal plan
-      const allIngredients = mealPlan.flatMap(day =>
-        [...(day.breakfast || []), ...(day.lunch || []), ...(day.dinner || [])]
-          .flatMap(meal => meal.recipe.ingredients || [])
-      );
-
-      const uniqueIngredients = [...new Set(allIngredients.map(ing => parseIngredient(ing).name))];
-
-      const pricePromises = uniqueIngredients.map(async (ingredient) => {
-        const data = await groceryPriceService.getIngredientPrice(ingredient as string);
-        return { ingredient: (ingredient as string).toLowerCase(), data };
+      const pricePromises = consolidated.map(async (item) => {
+        const data = await groceryPriceService.getIngredientPrice(item.item);
+        return { key: getIngredientKey(item.item), data };
       });
 
       const results = await Promise.all(pricePromises);
       const newPriceData: Record<string, PriceData> = {};
 
-      results.forEach(({ ingredient, data }) => {
+      results.forEach(({ key, data }) => {
         if (data) {
-          newPriceData[ingredient] = data;
+          newPriceData[key] = data;
         }
       });
 
@@ -117,7 +150,7 @@ export const GroceryCostEstimator: React.FC<GroceryCostEstimatorProps> = ({ meal
       await fetchCurrentPrices();
 
       addToast('Price submitted successfully! Thank you for contributing.', 'success');
-      
+
       AnalyticsService.trackEvent('grocery_price_submitted', {
         ingredient,
         price: price.toString(),
@@ -130,175 +163,46 @@ export const GroceryCostEstimator: React.FC<GroceryCostEstimatorProps> = ({ meal
     }
   };
 
-  const getIngredientKey = (ingredient: string): string => {
-    return ingredient.toLowerCase().split(' ')[0]; // Get first word
-  };
-
-  const parseIngredient = (ingredient: string): { name: string; quantity: number; unit: string } => {
-    // Use the same parsing logic as parseIngredientForShoppingList but return structured data
-    const parsed = parseIngredientForShoppingList(ingredient);
-    
-    // Extract quantity and unit from the parsed quantity string
-    const quantityParts = parsed.quantity.split(' ');
-    let quantity = 1;
-    let unit = 'each';
-    
-    if (quantityParts.length >= 1) {
-      // Handle fractions and decimals
-      const qtyStr = quantityParts[0];
-      if (qtyStr.includes('/')) {
-        // Handle fractions like "1/2"
-        const [numerator, denominator] = qtyStr.split('/').map(Number);
-        quantity = numerator / denominator;
-      } else {
-        quantity = parseFloat(qtyStr) || 1;
-      }
-      
-      // Check for unit in remaining parts
-      if (quantityParts.length > 1) {
-        unit = quantityParts.slice(1).join(' ').toLowerCase();
-      } else {
-        // Try to infer unit from the quantity string
-        const qtyMatch = parsed.quantity.match(/^(\d+(?:\/\d+)?(?:\.\d+)?)\s*(.+)$/);
-        if (qtyMatch) {
-          const qtyStr = qtyMatch[1];
-          if (qtyStr.includes('/')) {
-            // Handle fractions like "1/2" or "1 1/2"
-            const parts = qtyStr.split(' ');
-            let total = 0;
-            for (const part of parts) {
-              if (part.includes('/')) {
-                const [num, den] = part.split('/').map(Number);
-                total += num / den;
-              } else {
-                total += parseFloat(part) || 0;
-              }
-            }
-            quantity = total;
-          } else {
-            quantity = parseFloat(qtyStr) || 1;
-          }
-          unit = qtyMatch[2] || 'each';
-        }
-      }
-    }
-    
-    // Clean up the item name
-    let name = parsed.itemName.toLowerCase()
-      .replace(/\b(large|medium|small|big|tiny|huge|giant)\s+/gi, '')
-      .replace(/\b(ripe|raw|cooked|baked|fried|organic|chopped|minced|diced|sliced|grated)\s+/gi, '')
-      .trim();
-    
-    // Capitalize first letter
-    name = name.replace(/\b\w/g, l => l.toUpperCase());
-    
-    return { name, quantity, unit };
-  };
-
-  const estimateCost = (ingredient: string): IngredientCost => {
-    const parsed = parseIngredient(ingredient);
-    const key = getIngredientKey(parsed.name);
-    const normalizedKey = key.toLowerCase();
-
-    // Priority 1: Check if user has set a custom price
-    if (customPrices[key]) {
-      return {
-        ingredient: parsed.name,
-        quantity: parsed.quantity,
-        unit: parsed.unit,
-        estimatedCost: customPrices[key] * parsed.quantity,
-        source: 'known'
-      };
-    }
-
-    // Priority 2: Check real-time price data from API/user submissions
-    const realTimeData = priceData[normalizedKey];
-    if (realTimeData) {
-      return {
-        ingredient: parsed.name,
-        quantity: parsed.quantity,
-        unit: realTimeData.unit,
-        estimatedCost: priceFor(parsed.quantity, parsed.unit, realTimeData.minPrice, realTimeData.unit),
-        source: 'known'
-      };
-    }
-
-    // Priority 3: Curated price database (groceryPriceService's canonical price list,
-    // with plural-stripping and a generic per-unit fallback baked in).
-    const priceInfo = groceryPriceService.getDefaultPrice(parsed.name);
-    return {
-      ingredient: parsed.name,
-      quantity: parsed.quantity,
-      unit: priceInfo.unit,
-      estimatedCost: priceFor(parsed.quantity, parsed.unit, priceInfo.price, priceInfo.unit),
-      source: 'estimated'
-    };
-  };
-
-  // Price is quoted per `priceUnit` (e.g. $/lb) but the recipe quantity may be in a
-  // different unit (e.g. grams, oz, count) — convert before multiplying, or a per-lb
-  // price applied to a gram quantity inflates the estimate ~450x (F: $5000 ground beef).
-  const priceFor = (qty: number, qtyUnit: string, pricePerUnit: number, priceUnit: string): number => {
-    if (qtyUnit.toLowerCase() === priceUnit.toLowerCase()) {
-      return pricePerUnit * qty;
-    }
-    const converted = convertQuantity(qty, qtyUnit, priceUnit);
-    if (converted !== null) {
-      return pricePerUnit * converted;
-    }
-    // Units aren't convertible (e.g. count vs. weight) — multiplying directly would be
-    // wrong, but so would silently dropping the item. Treat qty as already being in
-    // priceUnit terms (the pre-existing behavior) rather than guessing further.
-    return pricePerUnit * qty;
-  };
-
   const costBreakdown = useMemo(() => {
-    const allIngredients = mealPlan.flatMap(day => 
-      [...(day.breakfast || []), ...(day.lunch || []), ...(day.dinner || [])].flatMap(meal => meal.recipe.ingredients || [])
-    );
-    
-    const tempShoppingItems: ShoppingItem[] = allIngredients.map((ing, idx) => {
-      const parsed = parseIngredient(ing);
+    return consolidated.map((item): IngredientCost => {
+      const key = getIngredientKey(item.item);
+      const qty = parseQuantity(item.amount ?? item.quantity);
+
+      // Priority 1: user-set custom price
+      if (customPrices[key]) {
+        return {
+          ingredient: item.item,
+          quantity: qty,
+          unit: item.unit || 'each',
+          estimatedCost: customPrices[key] * qty,
+          source: 'known'
+        };
+      }
+
+      // Priority 2: live price data (API/user submissions) — same formula the
+      // shopping list uses: averagePrice * raw quantity, no unit conversion.
+      const realTimeData = priceData[key];
+      if (realTimeData) {
+        return {
+          ingredient: item.item,
+          quantity: qty,
+          unit: item.unit || realTimeData.unit,
+          estimatedCost: realTimeData.averagePrice * qty,
+          source: 'known'
+        };
+      }
+
+      // Priority 3: curated default price database
+      const priceInfo = groceryPriceService.getDefaultPrice(item.item);
       return {
-        id: `temp-${idx}`,
-        item: parsed.name,
-        quantity: `${parsed.quantity} ${parsed.unit}`,
-        amount: parsed.quantity,
-        unit: parsed.unit,
-        category: '',
-        checked: false
+        ingredient: item.item,
+        quantity: qty,
+        unit: item.unit || priceInfo.unit,
+        estimatedCost: priceInfo.price * qty,
+        source: 'estimated'
       };
     });
-
-    const consolidated = consolidateShoppingList(tempShoppingItems);
-    
-    // Check inventory and calculate costs for missing items (or all items if includeAllIngredients is true)
-    const costItems: IngredientCost[] = [];
-    
-    consolidated.forEach(item => {
-      const name = item.item;
-      const totalQty = item.amount || 0;
-      const unit = item.unit || 'each';
-      const key = name.toLowerCase();
-
-      // Check if we have this in inventory
-      const inInventory = inventory.some(pantryItem => 
-        key.includes(pantryItem.item.toLowerCase()) || 
-        pantryItem.item.toLowerCase().includes(key)
-      );
-      
-      if (includeAllIngredients || !inInventory) {
-        const isCountUnit = ['pcs', 'pieces', 'each', 'count', 'units', 'unit'].includes(unit.toLowerCase());
-        const formatStr = isCountUnit ? `${totalQty} ${name}` : `${totalQty} ${unit} ${name}`;
-        const costItem = estimateCost(formatStr);
-        costItem.quantity = totalQty;
-        costItem.unit = unit;
-        costItems.push(costItem);
-      }
-    });
-    
-    return costItems;
-  }, [mealPlan, inventory, customPrices, includeAllIngredients]);
+  }, [consolidated, customPrices, priceData]);
 
   const visibleBreakdown = freeItemLimit !== undefined ? costBreakdown.slice(0, freeItemLimit) : costBreakdown;
   const lockedCount = freeItemLimit !== undefined ? Math.max(0, costBreakdown.length - freeItemLimit) : 0;
@@ -323,24 +227,13 @@ export const GroceryCostEstimator: React.FC<GroceryCostEstimatorProps> = ({ meal
           <DollarSign className="w-5 h-5" />
           Grocery Cost Estimator
         </h3>
-        <div className="flex items-center gap-4">
-          <label className="flex items-center gap-2 text-sm text-theme-secondary">
-            <input
-              type="checkbox"
-              checked={includeAllIngredients}
-              onChange={(e) => setIncludeAllIngredients(e.target.checked)}
-              className="rounded"
-            />
-            Include all ingredients
-          </label>
-          <button
-            onClick={() => toggleEstimator(false)}
-            className="text-theme-secondary hover:text-theme-primary"
-            aria-label="Close"
-          >
-            ✕
-          </button>
-        </div>
+        <button
+          onClick={() => toggleEstimator(false)}
+          className="text-theme-secondary hover:text-theme-primary"
+          aria-label="Close"
+        >
+          ✕
+        </button>
       </div>
 
       <div className="space-y-4">
@@ -349,7 +242,7 @@ export const GroceryCostEstimator: React.FC<GroceryCostEstimatorProps> = ({ meal
             {formatCurrency(totalCost)}
           </div>
           <div className="text-sm text-theme-secondary">
-            Estimated cost for {includeAllIngredients ? 'all' : 'missing'} ingredients
+            Estimated cost for ingredients not already in your pantry or on your shopping list
             {lockedCount > 0 && (
               <PaywallPrompt
                 variant="inline"
@@ -364,7 +257,7 @@ export const GroceryCostEstimator: React.FC<GroceryCostEstimatorProps> = ({ meal
 
         <div className="space-y-2">
           <div className="flex items-center justify-between">
-            <h4 className="font-medium text-theme-secondary">{includeAllIngredients ? 'All' : 'Missing'} Ingredients:</h4>
+            <h4 className="font-medium text-theme-secondary">Missing Ingredients:</h4>
             <button
               onClick={fetchCurrentPrices}
               disabled={loadingPrices}
@@ -375,12 +268,12 @@ export const GroceryCostEstimator: React.FC<GroceryCostEstimatorProps> = ({ meal
             </button>
           </div>
           {costBreakdown.length === 0 ? (
-            <p className="text-sm text-theme-secondary/70">All ingredients are in your pantry! 🎉</p>
+            <p className="text-sm text-theme-secondary/70">All ingredients are in your pantry or already on your shopping list! 🎉</p>
           ) : (
             <div className="space-y-2 max-h-60 overflow-y-auto">
               {visibleBreakdown.map((item, index) => {
-                const ingredientKey = getIngredientKey(item.ingredient).toLowerCase();
-                const realTimeData = priceData[ingredientKey];
+                const key = getIngredientKey(item.ingredient);
+                const realTimeData = priceData[key];
                 const hasRealTimeData = !!realTimeData;
 
                 return (
@@ -515,7 +408,7 @@ export const GroceryCostEstimator: React.FC<GroceryCostEstimatorProps> = ({ meal
             </div>
           </div>
           <div>
-            💡 <strong>Pro tip:</strong> Costs only include ingredients not already in your pantry. Use custom prices for the most accurate estimates.
+            💡 <strong>Pro tip:</strong> Costs only include ingredients not already in your pantry or on your shopping list. Use custom prices for the most accurate estimates.
           </div>
         </div>
       </div>

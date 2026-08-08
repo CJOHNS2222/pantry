@@ -1,5 +1,9 @@
 import React, { useState, useMemo } from 'react';
-import { useApp } from '../../contexts/AppContext';
+import { useNavigation } from '../../contexts/NavigationContext';
+import { useUserContext } from '../../contexts/UserContext';
+import { useInventoryContext } from '../../contexts/InventoryContext';
+import { useRecipeContext } from '../../contexts/RecipeContext';
+import { useMealPlanContext } from '../../contexts/MealPlanContext';
 import { useAppActions } from '../../contexts/AppActionsContext';
 import { useConfirm } from '../ui/ConfirmDialog';
 import { useToast } from '../ui/Toast';
@@ -34,26 +38,15 @@ import { useCommunityChecklist } from './useCommunityChecklist';
 import { useCommunityRatings, RecipeStats } from './useCommunityRatings';
 import { CommunityRecipesFeed, findRecipeForStat } from './CommunityRecipesFeed';
 
-interface CommunityProps {
-  onAddToPlan: (recipe: StructuredRecipe) => void;
-  onSaveRecipe?: (recipe: StructuredRecipe) => void;
-  user?: {
-    id: string;
-    name: string;
-    email: string;
-    avatar?: string;
-    profile?: {
-      householdSize?: number;
-    };
-  };
-}
-
 import { AchievementBadge } from '../../utils/achievementUtils';
 
-const CommunityComponent: React.FC<CommunityProps> = ({ onAddToPlan, onSaveRecipe, user }) => {
-  const app = useApp();
-  const { isLoadingRatings, setLoadingRatingsComplete, inventory = [], savedRecipes = [], mealPlan = [], household = null } = app;
-  const { setActiveTab, onRateRecipe, addToast } = useAppActions();
+const CommunityComponent: React.FC = () => {
+  const { setActiveTab } = useNavigation();
+  const { user, household = null } = useUserContext();
+  const { inventory = [] } = useInventoryContext();
+  const { savedRecipes = [], isLoadingRatings, setLoadingRatingsComplete } = useRecipeContext();
+  const { mealPlan = [] } = useMealPlanContext();
+  const { onRateRecipe, addToast, onAddToPlan, onSaveRecipe } = useAppActions();
   const confirm = useConfirm();
   const toast = useToast();
   

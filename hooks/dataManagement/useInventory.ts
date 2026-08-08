@@ -329,9 +329,7 @@ export function useInventory(
         undoMessage = `Restored "${itemToRestore.item}"`;
       } else if (actionToUndo.type === 'bulk_delete') {
         const itemsToRestore = actionToUndo.data as PantryItem[];
-        for (const item of itemsToRestore) {
-          await addItem(item);
-        }
+        await addItems(itemsToRestore);
         undoMessage = itemsToRestore.length === 1
           ? `Restored "${itemsToRestore[0].item}"`
           : `Restored ${itemsToRestore.length} items`;

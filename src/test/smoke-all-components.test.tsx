@@ -47,7 +47,6 @@ vi.useFakeTimers({ toFake: ['setInterval', 'clearInterval'] });
 const SKIP_COMPONENTS = new Set([
   'AdMobBanner',    // AdMob is disabled; native plugin not available in jsdom
   'QuickAdd',        // hangs in jsdom — scroll DOM queries never resolve
-  'PantryScanner',  // hangs in jsdom — camera/barcode scanner intervals never resolve
 ]);
 
 describe('Smoke tests: render components', () => {

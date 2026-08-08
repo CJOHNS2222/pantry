@@ -3,7 +3,7 @@ import { ChevronDown, ChevronUp, Sparkles } from 'lucide-react';
 import { searchRecipes } from '../../services/geminiService';
 import { setUserGeminiOptIn } from '../../services/featureFlags';
 import { getCachedRecipesCache, submitRecipeForReview, cacheGeminiSearchRecipes } from '../../services/recipeService';
-import { RecipeSearchResult, LoadingState, RecipeRating, StructuredRecipe, PantryItem, SavedRecipe, User, Household, RecipeSearchParams, RecipeSuggestion } from '../../types';
+import { RecipeSearchResult, LoadingState, StructuredRecipe, SavedRecipe, RecipeSearchParams } from '../../types';
 import { log } from '../../services/logService';
 import AnalyticsService from '../../services/analyticsService';
 import { UsageService } from '../../services/usageService';
@@ -26,6 +26,10 @@ import { RecipeFinderTabs } from '../recipe-finder/RecipeFinderTabs';
 import { RecipeFinderModalSection } from '../recipe-finder/RecipeFinderModalSection';
 import { Tab } from '../../types/app';
 import { useAppActions } from '../../contexts/AppActionsContext';
+import { useNavigation } from '../../contexts/NavigationContext';
+import { useUserContext } from '../../contexts/UserContext';
+import { useInventoryContext } from '../../contexts/InventoryContext';
+import { useRecipeContext } from '../../contexts/RecipeContext';
 import SmartRecommendations from '../pantry/SmartRecommendations';
 import { RecipeRecommendations } from './RecipeRecommendations';
 import { FALLBACK_CSV_RECIPES } from '../../data/fallbackRecipes';
@@ -38,39 +42,34 @@ type RecipeFinderSearchParams = Partial<RecipeSearchParams> & {
     cuisineFilter?: string;
 };
 
-interface RecipeFinderProps {
-    onAddToPlan: (recipe: StructuredRecipe) => void;
-    onSaveRecipe: (recipe: StructuredRecipe) => void;
-    onDeleteRecipe: (recipe: SavedRecipe) => void;
-    onMarkAsMade?: (recipe: StructuredRecipe) => void;
-    inventory: PantryItem[];
-    ratings: RecipeRating[];
-    onRate: (rating: RecipeRating) => void;
-    savedRecipes: SavedRecipe[];
-    user: User;
-    setActiveTab: (tab: Tab) => void;
-    persistedResult?: RecipeSearchResult | null;
-    setPersistedResult?: (result: RecipeSearchResult | null) => void;
-    initialSearchQuery?: string;
-    addToast?: (message: string, type?: 'error' | 'info' | 'success', ttl?: number, actionLabel?: string, action?: () => void) => void;
-    // Usage limit states
-    recipeSaveLimitExceeded?: boolean;
-    mealPlanLimitExceeded?: boolean;
-    // Loading states
-    isLoadingSavedRecipes?: boolean;
-    // Household data for preference filtering
-    household?: Household | null;
-    // Per-item expiring-soon suggestions + actions, forwarded to SmartRecommendations
-    recipeSuggestions?: RecipeSuggestion[];
-    onDeleteItem?: (index: number, disposalReason?: 'thrown_away' | 'cooked' | 'remove') => Promise<void>;
-    setInitialSearchQuery?: (query: string) => void;
-}
-
 // List of staple items to ignore in recipe calculations
 const STAPLES = ['salt', 'pepper', 'oil', 'water', 'flour', 'sugar', 'butter', 'vinegar', 'baking powder', 'baking soda', 'spices', 'seasoning', 'soy sauce', 'cornstarch', 'yeast'];
 
-const RecipeFinderComponent: React.FC<RecipeFinderProps> = ({ onAddToPlan, onSaveRecipe, onDeleteRecipe, onMarkAsMade, inventory, ratings = [], onRate, savedRecipes, user, setActiveTab, persistedResult, setPersistedResult, initialSearchQuery, addToast, recipeSaveLimitExceeded = false, mealPlanLimitExceeded = false, isLoadingSavedRecipes = false, household, recipeSuggestions, onDeleteItem, setInitialSearchQuery }) => {
-    const { setActiveSettingsCategory } = useAppActions();
+const RecipeFinderComponent: React.FC = () => {
+    const { setActiveTab } = useNavigation();
+    const { user, household } = useUserContext();
+    const { inventory, recipeSuggestions } = useInventoryContext();
+    const {
+        ratings = [],
+        savedRecipes,
+        persistedRecipeResult: persistedResult,
+        setPersistedRecipeResult: setPersistedResult,
+        initialSearchQuery,
+        setInitialSearchQuery,
+        recipeSaveLimitExceeded = false,
+        mealPlanLimitExceeded = false,
+        isLoadingSavedRecipes = false,
+    } = useRecipeContext();
+    const {
+        onAddToPlan,
+        onSaveRecipe,
+        onDeleteRecipe,
+        handleMarkAsMade: onMarkAsMade,
+        onRateRecipe: onRate,
+        addToast,
+        setActiveSettingsCategory,
+        deleteItem: onDeleteItem,
+    } = useAppActions();
     const intl = useIntl();
     // Pre-computed inventory lookup data for fast feasibility calculations
     const inventoryLookup = useMemo(() => {

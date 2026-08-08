@@ -2,7 +2,7 @@ import React from 'react';
 import { render, screen, fireEvent, waitFor, cleanup } from '@testing-library/react';
 import { describe, it, expect, vi, afterEach, beforeEach } from 'vitest';
 import { MealPlanner } from '../../../components/recipes-meals/MealPlanner';
-import { DayPlan, SavedRecipe, PantryItem } from '../../../types';
+import { DayPlan, SavedRecipe } from '../../../types';
 
 // Mock react-intl
 vi.mock('react-intl', () => ({
@@ -40,21 +40,71 @@ vi.mock('../../../utils/preferenceUtils', () => ({
     mockIsRecipeSafeFromAllergies()
 }));
 
-// Mock AppContext
-vi.mock('../../../contexts/AppContext', () => ({
-  useApp: () => ({
-    household: { id: 'household1', members: [] },
-    user: { id: 'user1', profile: {} },
-  }),
-}));
-
-// Mock AppActionsContext
+// Mock the domain-scoped contexts MealPlanner reads from directly.
 const mockAddToast = vi.fn();
 const mockSetActiveTab = vi.fn();
+let mockUpdateMealPlan = vi.fn();
+let mockMealPlanState: DayPlan[] = [];
+let mockSavedRecipesState: SavedRecipe[] = [];
+let mockUserState: any = { id: 'user1', profile: {} };
+
+vi.mock('../../../contexts/NavigationContext', () => ({
+  useNavigation: () => ({ setActiveTab: mockSetActiveTab, activeTab: 'meals', activeSettingsCategory: null }),
+}));
+vi.mock('../../../contexts/UserContext', () => ({
+  useUserContext: () => ({
+    user: mockUserState,
+    household: { id: 'household1', members: [] },
+    isLoadingHousehold: false,
+    recentActivities: [],
+    isLoadingActivities: false,
+  }),
+}));
+vi.mock('../../../contexts/InventoryContext', () => ({
+  useInventoryContext: () => ({
+    inventory: [],
+    setInventory: vi.fn(),
+    isLoadingInventory: false,
+    consumptionSuggestions: [],
+    expirationAlerts: [],
+    recipeSuggestions: [],
+  }),
+}));
+vi.mock('../../../contexts/ShoppingContext', () => ({
+  useShoppingContext: () => ({ shoppingList: [], setShoppingList: vi.fn(), isLoadingShoppingList: false }),
+}));
+vi.mock('../../../contexts/MealPlanContext', () => ({
+  useMealPlanContext: () => ({ mealPlan: mockMealPlanState, setMealPlan: vi.fn(), isLoadingMealPlan: false }),
+}));
+vi.mock('../../../contexts/RecipeContext', () => ({
+  useRecipeContext: () => ({
+    savedRecipes: mockSavedRecipesState,
+    ratings: [],
+    persistedRecipeResult: null,
+    setPersistedRecipeResult: vi.fn(),
+    initialSearchQuery: '',
+    setInitialSearchQuery: vi.fn(),
+    isLoadingSavedRecipes: false,
+    isLoadingRatings: false,
+    setLoadingRatingsComplete: vi.fn(),
+    recipeSaveLimitExceeded: false,
+    mealPlanLimitExceeded: false,
+  }),
+}));
+vi.mock('../../../contexts/SettingsDataContext', () => ({
+  useSettingsDataContext: () => ({ settings: undefined, setSettings: vi.fn(), customCategories: [] }),
+}));
 vi.mock('../../../contexts/AppActionsContext', () => ({
   useAppActions: () => ({
     addToast: mockAddToast,
     setActiveTab: mockSetActiveTab,
+    setActiveSettingsCategory: vi.fn(),
+    updateMealPlan: mockUpdateMealPlan,
+    onAddToShoppingList: vi.fn(),
+    onAddToPlan: vi.fn(),
+    onSaveRecipe: vi.fn(),
+    handleMarkAsMade: vi.fn(),
+    onRateRecipe: vi.fn(),
   }),
 }));
 
@@ -194,23 +244,16 @@ describe('MealPlanner - AutoFill Plan', () => {
     const updateMealPlan = vi.fn((newPlan) => {
       updatedPlan = newPlan;
     });
+    mockUpdateMealPlan = updateMealPlan;
+    mockMealPlanState = mockMealPlan;
+    mockSavedRecipesState = mockSavedRecipes;
+    mockUserState = mockUser;
 
     // We pass 2 saved recipes, and want to auto-fill dinner for 5 days.
     // That means we need 5 recipes. The first 2 should be 'Saved Recipe One' and 'Saved Recipe Two'.
     // The next 3 should be chosen from the cached popular recipes.
     // All 5 assigned recipes should be unique.
-    render(
-      <MealPlanner
-        mealPlan={mockMealPlan}
-        updateMealPlan={updateMealPlan}
-        inventory={[]}
-        shoppingList={[]}
-        addToShoppingList={vi.fn()}
-        user={mockUser}
-        setActiveTab={mockSetActiveTab}
-        savedRecipes={mockSavedRecipes}
-      />
-    );
+    render(<MealPlanner />);
 
     // Switch to Auto Fill Plan sub-tab
     const autoFillBtn = screen.getByRole('button', { name: /auto fill plan/i });

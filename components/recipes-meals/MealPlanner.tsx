@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
-import { DayPlan, MealPlanItem, PantryItem, StructuredRecipe, User, SavedRecipe, ShoppingItem, RecipeRating } from '../../types';
+import { DayPlan, MealPlanItem, PantryItem, StructuredRecipe, SavedRecipe } from '../../types';
 import RecipeModal from './RecipeModal';
 import { RecipeModalDeductPantryModal } from '../recipe-modal/RecipeModalDeductPantryModal';
 import { MealPrepPlanner } from './MealPrepPlanner';
@@ -15,7 +15,13 @@ import { RecipeSearchOverlay } from '../meal-planner/RecipeSearchOverlay';
 import { MealPlanAutoFillModal, AutoFillPreferences } from '../meal-planner/MealPlanAutoFillModal';
 import { useMealPlannerModalStack } from '../meal-planner/useMealPlannerModalStack';
 import { useIntl } from 'react-intl';
-import { useApp } from '../../contexts/AppContext';
+import { useNavigation } from '../../contexts/NavigationContext';
+import { useUserContext } from '../../contexts/UserContext';
+import { useInventoryContext } from '../../contexts/InventoryContext';
+import { useShoppingContext } from '../../contexts/ShoppingContext';
+import { useMealPlanContext } from '../../contexts/MealPlanContext';
+import { useRecipeContext } from '../../contexts/RecipeContext';
+import { useSettingsDataContext } from '../../contexts/SettingsDataContext';
 import { useAppActions } from '../../contexts/AppActionsContext';
 import { useSubscription } from '../../hooks/useSubscription';
 import { UsageService } from '../../services/usageService';
@@ -24,7 +30,6 @@ import { useModalOpen } from '../../utils/useModalOpen';
 import { useAndroidBack } from '../../hooks/useAndroidBack';
 import { getMealPrepSuggestions } from '../../utils/searchUtils';
 import CalendarService from '../../services/calendarService';
-import type { Settings } from '../../types';
 import { getCachedPopularRecipes } from '../../services/recipeService';
 import { rankCachedRecipesByPreferences, isRecipeSafeFromAllergies } from '../../utils/preferenceUtils';
 import { log } from '../../services/logService';
@@ -86,30 +91,28 @@ const generateRecipePlaceholderImage = (title: string): string => {
 };
 
 interface MealPlannerProps {
-  mealPlan: DayPlan[];
-  updateMealPlan: (newPlan: DayPlan[]) => void;
-  inventory: PantryItem[];
-  shoppingList: ShoppingItem[];
-  addToShoppingList: (items: (string | { item: string; source: string; notes?: string })[], source?: string) => void;
-  onAddToPlan?: (recipe: StructuredRecipe, dayIndex?: number, mealType?: 'breakfast' | 'lunch' | 'dinner') => void;
-  onSaveRecipe?: (recipe: StructuredRecipe) => void;
-  onMarkAsMade?: (recipe: StructuredRecipe, deductions?: { itemId: string; ingredient: string }[]) => void;
-  onRate?: (rating: RecipeRating) => void;
-  user: User;
-  setActiveTab: (tab: Tab) => void;
-  recipeSaveLimitExceeded?: boolean;
-  mealPlanLimitExceeded?: boolean;
-  isLoadingMealPlan?: boolean;
-  isLoadingSavedRecipes?: boolean;
-  savedRecipes?: SavedRecipe[];
-  settings?: Settings;
   onOpenRecipeSearch?: () => void;
 }
 
-const MealPlannerComponent: React.FC<MealPlannerProps> = ({ mealPlan, updateMealPlan, inventory, shoppingList, addToShoppingList, onAddToPlan, onSaveRecipe, onMarkAsMade, onRate, user, setActiveTab, recipeSaveLimitExceeded = false, mealPlanLimitExceeded = false, isLoadingMealPlan = false, savedRecipes: propSavedRecipes = [], settings }) => {
-  const { addToast, setActiveSettingsCategory } = useAppActions();
+const MealPlannerComponent: React.FC<MealPlannerProps> = ({ onOpenRecipeSearch: _onOpenRecipeSearch }) => {
+  const { setActiveTab } = useNavigation();
+  const { user, household } = useUserContext();
+  const { inventory } = useInventoryContext();
+  const { shoppingList } = useShoppingContext();
+  const { mealPlan, isLoadingMealPlan = false } = useMealPlanContext();
+  const { savedRecipes, recipeSaveLimitExceeded = false, mealPlanLimitExceeded = false } = useRecipeContext();
+  const { settings } = useSettingsDataContext();
+  const {
+    addToast,
+    setActiveSettingsCategory,
+    updateMealPlan,
+    onAddToShoppingList: addToShoppingList,
+    onAddToPlan,
+    onSaveRecipe,
+    handleMarkAsMade: onMarkAsMade,
+    onRateRecipe: onRate,
+  } = useAppActions();
   const intl = useIntl();
-  const { household } = useApp();
   const { isPremium, isFamily } = useSubscription(user);
   const [usageLimits, setUsageLimits] = useState<UsageLimits | null>(null);
   useEffect(() => {
@@ -137,11 +140,6 @@ const MealPlannerComponent: React.FC<MealPlannerProps> = ({ mealPlan, updateMeal
   const [isEstimatorOpen, setIsEstimatorOpen] = useState(false);
   const [isCalendarExpanded, setIsCalendarExpanded] = useState(false);
   const [currentCalendarMonth, setCurrentCalendarMonth] = useState(new Date());
-
-  // Use prop savedRecipes or local state as fallback
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  const [localSavedRecipes, setLocalSavedRecipes] = useState<SavedRecipe[]>([]);
-  const savedRecipes = propSavedRecipes.length > 0 ? propSavedRecipes : localSavedRecipes;
 
   const activeMealPlanRecipes = useMemo(() => {
     if (!mealPlan) return [];
@@ -315,7 +313,7 @@ const MealPlannerComponent: React.FC<MealPlannerProps> = ({ mealPlan, updateMeal
   // Load saved recipes for meal prep suggestions on component mount (only if no prop recipes)
   useEffect(() => {
     // No longer need to load recipes since we use prop savedRecipes
-  }, [propSavedRecipes.length]);
+  }, [savedRecipes.length]);
 
   // Close help tooltip when clicking outside
   useEffect(() => {
@@ -1129,7 +1127,7 @@ const MealPlannerComponent: React.FC<MealPlannerProps> = ({ mealPlan, updateMeal
           isEstimatorOpen={isEstimatorOpen}
           showPriceData={settings?.shopping?.showPriceData ?? false}
           mealPlan={mealPlan}
-          inventory={inventory}
+          missingIngredients={missingIngredients}
           freeItemLimit={isPremium || isFamily ? undefined : 5}
           onEstimatorToggle={setIsEstimatorOpen}
           todaysMeals={todaysMeals}
@@ -1283,7 +1281,7 @@ const MealPlannerComponent: React.FC<MealPlannerProps> = ({ mealPlan, updateMeal
         }}
         inventory={inventory}
         user={user}
-        savedRecipes={propSavedRecipes}
+        savedRecipes={savedRecipes}
         household={household}
       />
 
