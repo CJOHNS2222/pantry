@@ -40,6 +40,14 @@ export function useAuth() {
         // Restore a guest session if the user had previously chosen guest mode
         const guestId = localStorage.getItem(GUEST_USER_ID_KEY);
         if (guestId) {
+          let guestProfile: User['profile'] | undefined;
+          try {
+            const stored = JSON.parse(localStorage.getItem('guestProfile') || '{}');
+            guestProfile = Object.keys(stored).length > 0 ? stored : undefined;
+          } catch (_e) {
+            guestProfile = undefined;
+          }
+
           setUser({
             id: guestId,
             name: 'Guest',
@@ -48,7 +56,8 @@ export function useAuth() {
             isGuest: true,
             hasSeenTutorial: false,
             discoveredFeatures: [],
-            dismissedTutorialTips: []
+            dismissedTutorialTips: [],
+            profile: guestProfile
           });
         }
 

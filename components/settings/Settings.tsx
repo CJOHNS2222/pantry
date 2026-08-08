@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, Suspense, lazy } from 'react';
 import { Timestamp } from 'firebase/firestore';
 import DatabaseMonitoringService from '../../services/databaseMonitoringService';
 import { CategoryManager } from '../pantry/CategoryManager';
@@ -7,8 +7,6 @@ import { log } from '../../services/logService';
 import { useIntl } from 'react-intl';
 import AnalyticsService from '../../services/analyticsService';
 import { useNotifications } from '../../hooks/useNotifications';
-import { FAQPage } from './FAQPage';
-import { SettingsHelpSection } from './SettingsHelpSection';
 import { User, UserProfile, Member } from '../../types';
 import { useNavigation } from '../../contexts/NavigationContext';
 import { useUserContext } from '../../contexts/UserContext';
@@ -18,7 +16,7 @@ import { useAppActions } from '../../contexts/AppActionsContext';
 
 type MemberPreferences = Pick<Member, 'dietaryRestrictions' | 'allergies' | 'dietGoal' | 'favoriteCuisines' | 'specialNeeds' | 'preferredProteins' | 'dislikedIngredients'>;
 import { NotificationService, NotificationSettings } from '../../services/notificationBuilderService';
-import { Loader2, Heart, AlertTriangle, X, Settings as SettingsIcon, User as UserIcon, ChevronLeft, ChevronRight, Sliders, Bell, TrendingDown, MessageSquare, HelpCircle, RefreshCw, Sparkles, Shield, Star } from 'lucide-react';
+import { ChevronLeft } from 'lucide-react';
 import { userOptedInToGemini, setUserGeminiOptIn, getGeminiUsage } from '../../services/featureFlags';
 
 import { serverTimestamp } from 'firebase/firestore';
@@ -34,30 +32,19 @@ import { useIsAdmin } from '../../hooks/useIsAdmin';
 import { useConfirm } from '../ui/ConfirmDialog';
 import { HOUSEHOLD_LEFT_AT_KEY } from '../../hooks/useAuth';
 import { useAndroidBack } from '../../hooks/useAndroidBack';
-import { SettingsFeedbackSection } from './SettingsFeedbackSection';
-import { SettingsAppUpdatesSection } from './SettingsAppUpdatesSection';
-import { SettingsAppPreferencesSection } from './SettingsAppPreferencesSection';
-import { SettingsCategoriesSection } from './SettingsCategoriesSection';
-import { SettingsFoodSafetySection } from './SettingsFoodSafetySection';
-import { SettingsGuestBanner } from './SettingsGuestBanner';
-import HapticService from '../../services/hapticService';
-import { SettingsHouseholdSection } from './SettingsHouseholdSection';
-import { SettingsLeftoverAnalyticsSection } from './SettingsLeftoverAnalyticsSection';
-import { SettingsNotificationsSection } from './SettingsNotificationsSection';
-import { SettingsPantryImagesSection } from './SettingsPantryImagesSection';
-import { SettingsPendingNotificationsSection } from './SettingsPendingNotificationsSection';
-import { SettingsPrivacyLegalSection } from './SettingsPrivacyLegalSection';
-import { SettingsRemoteConfigDebugSection } from './SettingsRemoteConfigDebugSection';
-import { SettingsResetUsageSection } from './SettingsResetUsageSection';
 
-import { SettingsStoreLayoutSection } from './SettingsStoreLayoutSection';
-import { SettingsSubscriptionSection } from './SettingsSubscriptionSection';
-import { SettingsThemeSection } from './SettingsThemeSection';
-import { SettingsUsageLimitsSection } from './SettingsUsageLimitsSection';
-import { SettingsTabVisibilitySection } from './SettingsTabVisibilitySection';
-import { MonitoringDashboard } from '../admin-analytics/MonitoringDashboard';
-import PerformanceMonitoringDashboard from '../admin-analytics/PerformanceMonitoringDashboard';
-import UserBehaviorAnalytics from '../admin-analytics/UserBehaviorAnalytics';
+const SettingsCategoryList = lazy(() => import('./SettingsCategoryList').then(m => ({ default: m.SettingsCategoryList })));
+const SettingsAccountInfoPage = lazy(() => import('./SettingsAccountInfoPage').then(m => ({ default: m.SettingsAccountInfoPage })));
+const SettingsSubscriptionPage = lazy(() => import('./SettingsSubscriptionPage').then(m => ({ default: m.SettingsSubscriptionPage })));
+const SettingsPreferencesPage = lazy(() => import('./SettingsPreferencesPage').then(m => ({ default: m.SettingsPreferencesPage })));
+const SettingsNotificationsPage = lazy(() => import('./SettingsNotificationsPage').then(m => ({ default: m.SettingsNotificationsPage })));
+const SettingsFoodWastePage = lazy(() => import('./SettingsFoodWastePage').then(m => ({ default: m.SettingsFoodWastePage })));
+const SettingsHelpAndSupportPage = lazy(() => import('./SettingsHelpAndSupportPage').then(m => ({ default: m.SettingsHelpAndSupportPage })));
+const SettingsUpdatePage = lazy(() => import('./SettingsUpdatePage').then(m => ({ default: m.SettingsUpdatePage })));
+const SettingsAdminPage = lazy(() => import('./SettingsAdminPage').then(m => ({ default: m.SettingsAdminPage })));
+const SettingsMemberPreferencesModal = lazy(() => import('./SettingsMemberPreferencesModal').then(m => ({ default: m.SettingsMemberPreferencesModal })));
+const SettingsFAQModal = lazy(() => import('./SettingsFAQModal').then(m => ({ default: m.SettingsFAQModal })));
+const SettingsDeleteAccountModal = lazy(() => import('./SettingsDeleteAccountModal').then(m => ({ default: m.SettingsDeleteAccountModal })));
 
 const defaultStoreLayout = [
   'Produce',
@@ -214,9 +201,6 @@ const SettingsComponent: React.FC = () => {
   // Delete account state
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [isDeletingAccount, setIsDeletingAccount] = useState(false);
-
-  // Admin analytics dashboards state (admin-only)
-  const [adminDashboardTab, setAdminDashboardTab] = useState<'monitoring' | 'performance' | 'behavior'>('monitoring');
 
   useAndroidBack(showAvatarSelection, () => setShowAvatarSelection(false));
   useAndroidBack(showCategoryManager, () => setShowCategoryManager(false));
@@ -416,9 +400,9 @@ const SettingsComponent: React.FC = () => {
     setSavingProfile(true);
     try {
       const userRef = DatabaseMonitoringService.doc('users', user.id);
-      await DatabaseMonitoringService.updateDoc(userRef, {
+      await DatabaseMonitoringService.setDoc(userRef, {
         profile: userProfile
-      });
+      }, { merge: true });
       setProfileChanged(false);
       addToast?.('Profile updated successfully!', 'success');
     } catch (error) {
@@ -436,7 +420,7 @@ const SettingsComponent: React.FC = () => {
     setSavingProfile(true);
     try {
       const userRef = DatabaseMonitoringService.doc('users', user.id);
-      await DatabaseMonitoringService.updateDoc(userRef, { profile: data });
+      await DatabaseMonitoringService.setDoc(userRef, { profile: data }, { merge: true });
       setProfileChanged(false);
       if (!silent) addToast?.('Profile updated successfully!', 'success');
     } catch (error) {
@@ -521,8 +505,6 @@ const SettingsComponent: React.FC = () => {
       setIsCreatingHousehold(false);
     }
   };
-
-  const avatarOptions = Array.from({ length: 35 }, (_, i) => `/avatars/memo_${i + 1}.png`);
 
   const handleAvatarSelect = async (avatarPath: string) => {
     if (!user) return;
@@ -610,9 +592,12 @@ const SettingsComponent: React.FC = () => {
     setUpdatingBulkImages(true);
     try {
       const { BulkImageUpdateService } = await import('../../services/bulkImageUpdateService');
-      const result = await BulkImageUpdateService.updateAllPantryItemImages(user, (completed, total) => {
+      const onProgress = (completed: number, total: number) => {
         log.info(`Updated ${completed}/${total} items`, { completed, total }, 'Settings');
-      });
+      };
+      const result = household
+        ? await BulkImageUpdateService.updateHouseholdPantryItemImages(household.id, onProgress)
+        : await BulkImageUpdateService.updateAllPantryItemImages(user, onProgress);
 
       addToast?.(
         `Updated ${result.updatedItems} items${result.failedItems > 0 ? ` (${result.failedItems} failed)` : ''}`,
@@ -645,203 +630,14 @@ const SettingsComponent: React.FC = () => {
       <div className="pb-24 max-w-md mx-auto">
       
       {activeCategory === null ? (
-        <div className="pt-4 px-6 space-y-6">
-          <div className="text-center pb-4">
-            <h2 className="text-3xl font-serif font-bold text-theme-primary">Settings</h2>
-            <p className="text-xs text-theme-secondary mt-1">Configure your app and manage your kitchen data</p>
-          </div>
-
-          <SettingsGuestBanner
+        <Suspense fallback={null}>
+          <SettingsCategoryList
             isGuest={!!user?.isGuest}
             onLogout={onLogout}
+            isAdmin={isAdmin}
+            setActiveCategory={setActiveCategory}
           />
-
-          <div className="bg-theme-secondary border border-theme rounded-2xl overflow-hidden divide-y divide-theme shadow-sm">
-            {/* Account Info */}
-            <button
-              onClick={() => { HapticService.light(); setActiveCategory('account_info'); }}
-              className="w-full flex items-center justify-between p-4 hover:bg-theme-primary/5 transition-colors text-left focus:outline-none"
-              data-category="account-info"
-            >
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-xl bg-[var(--accent-color)]/10 flex items-center justify-center text-[var(--accent-color)]">
-                  <UserIcon className="w-5 h-5" />
-                </div>
-                <div>
-                  <span className="font-semibold text-theme-primary block text-sm">Account Info</span>
-                  <span className="text-[11px] text-theme-secondary opacity-70">Profile, subscription details, household sharing</span>
-                </div>
-              </div>
-              <ChevronRight className="w-4 h-4 text-theme-secondary" />
-            </button>
-
-            {/* Subscription */}
-            <button
-              onClick={() => { HapticService.light(); setActiveCategory('subscription'); }}
-              className="w-full flex items-center justify-between p-4 hover:bg-theme-primary/5 transition-colors text-left focus:outline-none"
-              data-category="subscription"
-            >
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-xl bg-[var(--accent-color)]/10 flex items-center justify-center text-[var(--accent-color)]">
-                  <Star className="w-5 h-5" />
-                </div>
-                <div>
-                  <span className="font-semibold text-theme-primary block text-sm">Subscription</span>
-                  <span className="text-[11px] text-theme-secondary opacity-70">Plan, billing, upgrade or manage premium</span>
-                </div>
-              </div>
-              <ChevronRight className="w-4 h-4 text-theme-secondary" />
-            </button>
-
-            {/* Preferences */}
-            <button
-              onClick={() => { HapticService.light(); setActiveCategory('preferences'); }}
-              className="w-full flex items-center justify-between p-4 hover:bg-theme-primary/5 transition-colors text-left focus:outline-none"
-              data-category="preferences"
-            >
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-xl bg-[var(--accent-color)]/10 flex items-center justify-center text-[var(--accent-color)]">
-                  <Sliders className="w-5 h-5" />
-                </div>
-                <div>
-                  <span className="font-semibold text-theme-primary block text-sm">Preferences & Theme</span>
-                  <span className="text-[11px] text-theme-secondary opacity-70">App theme, currency, dietary restrictions, units</span>
-                </div>
-              </div>
-              <ChevronRight className="w-4 h-4 text-theme-secondary" />
-            </button>
-
-            {/* Notifications */}
-            <button
-              onClick={() => { HapticService.light(); setActiveCategory('notifications'); }}
-              className="w-full flex items-center justify-between p-4 hover:bg-theme-primary/5 transition-colors text-left focus:outline-none"
-              data-category="notifications"
-            >
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-xl bg-[var(--accent-color)]/10 flex items-center justify-center text-[var(--accent-color)]">
-                  <Bell className="w-5 h-5" />
-                </div>
-                <div>
-                  <span className="font-semibold text-theme-primary block text-sm">Notifications & Reminders</span>
-                  <span className="text-[11px] text-theme-secondary opacity-70">Push notifications, expiration alerts, meal plan reminders</span>
-                </div>
-              </div>
-              <ChevronRight className="w-4 h-4 text-theme-secondary" />
-            </button>
-
-            {/* Food Waste & Expiration Settings */}
-            <button
-              onClick={() => { HapticService.light(); setActiveCategory('food_waste'); }}
-              className="w-full flex items-center justify-between p-4 hover:bg-theme-primary/5 transition-colors text-left focus:outline-none"
-              data-category="food-waste"
-            >
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-xl bg-[var(--accent-color)]/10 flex items-center justify-center text-[var(--accent-color)]">
-                  <TrendingDown className="w-5 h-5" />
-                </div>
-                <div>
-                  <span className="font-semibold text-theme-primary block text-sm">Food Waste & Expiration Rules</span>
-                  <span className="text-[11px] text-theme-secondary opacity-70">Shelf life thresholds, auto-add staples, waste tracking</span>
-                </div>
-              </div>
-              <ChevronRight className="w-4 h-4 text-theme-secondary" />
-            </button>
-
-            {/* Contact Us */}
-            <button
-              onClick={() => { HapticService.light(); setActiveCategory('contact_us'); }}
-              className="w-full flex items-center justify-between p-4 hover:bg-theme-primary/5 transition-colors text-left focus:outline-none"
-              data-category="contact-us"
-            >
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-xl bg-[var(--accent-color)]/10 flex items-center justify-center text-[var(--accent-color)]">
-                  <MessageSquare className="w-5 h-5" />
-                </div>
-                <div>
-                  <span className="font-semibold text-theme-primary block text-sm">Contact Us & Feedback</span>
-                  <span className="text-[11px] text-theme-secondary opacity-70">Report an issue, request a feature, contact support</span>
-                </div>
-              </div>
-              <ChevronRight className="w-4 h-4 text-theme-secondary" />
-            </button>
-
-            {/* Help & Tutorials */}
-            <button
-              onClick={() => { HapticService.light(); setActiveCategory('help'); }}
-              className="w-full flex items-center justify-between p-4 hover:bg-theme-primary/5 transition-colors text-left focus:outline-none"
-              data-category="help"
-            >
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-xl bg-[var(--accent-color)]/10 flex items-center justify-center text-[var(--accent-color)]">
-                  <HelpCircle className="w-5 h-5" />
-                </div>
-                <div>
-                  <span className="font-semibold text-theme-primary block text-sm">Help & FAQ</span>
-                  <span className="text-[11px] text-theme-secondary opacity-70">Frequently asked questions, app guide</span>
-                </div>
-              </div>
-              <ChevronRight className="w-4 h-4 text-theme-secondary" />
-            </button>
-
-            {/* Update */}
-            <button
-              onClick={() => { HapticService.light(); setActiveCategory('update'); }}
-              className="w-full flex items-center justify-between p-4 hover:bg-theme-primary/5 transition-colors text-left focus:outline-none"
-              data-category="update"
-            >
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-xl bg-[var(--accent-color)]/10 flex items-center justify-center text-[var(--accent-color)]">
-                  <RefreshCw className="w-5 h-5" />
-                </div>
-                <div>
-                  <span className="font-semibold text-theme-primary block text-sm">Update</span>
-                  <span className="text-[11px] text-theme-secondary opacity-70">App updates and version details</span>
-                </div>
-              </div>
-              <ChevronRight className="w-4 h-4 text-theme-secondary" />
-            </button>
-
-            {/* Admin Analytics (admin-only) */}
-            {isAdmin && (
-              <button
-                onClick={() => setActiveCategory('admin_analytics')}
-                className="w-full flex items-center justify-between p-4 hover:bg-theme-primary/5 transition-colors text-left focus:outline-none"
-                data-category="admin-analytics"
-              >
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-xl bg-[var(--accent-color)]/10 flex items-center justify-center text-[var(--accent-color)]">
-                    <Shield className="w-5 h-5" />
-                  </div>
-                  <div>
-                    <span className="font-semibold text-theme-primary block text-sm">Admin Analytics</span>
-                    <span className="text-[11px] text-theme-secondary opacity-70">Monitoring, performance, and user behavior dashboards</span>
-                  </div>
-                </div>
-                <ChevronRight className="w-4 h-4 text-theme-secondary" />
-              </button>
-            )}
-
-            {/* Replay Onboarding */}
-            {onReplayOnboarding && (
-              <button
-                onClick={onReplayOnboarding}
-                className="w-full flex items-center justify-between p-4 hover:bg-theme-primary/5 transition-colors text-left focus:outline-none"
-                data-category="replay-onboarding"
-              >
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-xl bg-[var(--accent-color)]/10 flex items-center justify-center text-[var(--accent-color)]">
-                    <Sparkles className="w-5 h-5" />
-                  </div>
-                  <div>
-                    <span className="font-semibold text-theme-primary block text-sm">Replay Onboarding</span>
-                    <span className="text-[11px] text-theme-secondary opacity-70">Restart the onboarding tutorial flow</span>
-                  </div>
-                </div>
-                <ChevronRight className="w-4 h-4 text-theme-secondary" />
-              </button>
-            )}
-          </div>
-        </div>
+        </Suspense>
       ) : (
         <div className="pt-4 pb-6 px-6 space-y-6">
           <button
@@ -851,627 +647,209 @@ const SettingsComponent: React.FC = () => {
             <ChevronLeft className="w-4 h-4" /> Back to Settings
           </button>
 
-          {activeCategory === 'account_info' && <>
-            <SettingsGuestBanner
-              isGuest={!!user?.isGuest}
-              onLogout={onLogout}
-            />
+          {activeCategory === 'account_info' && (
+            <Suspense fallback={null}>
+              <SettingsAccountInfoPage
+                user={user}
+                onLogout={onLogout}
+                userProfile={userProfile}
+                onProfileChange={handleProfileChange}
+                showAvatarSelection={showAvatarSelection}
+                setShowAvatarSelection={setShowAvatarSelection}
+                updatingAvatar={updatingAvatar}
+                onAvatarSelect={handleAvatarSelect}
+                onRemoveAvatar={handleRemoveAvatar}
+                profileChanged={profileChanged}
+                savingProfile={savingProfile}
+                onSaveProfile={saveProfile}
+                foodSafetyTitle={intl.formatMessage({ id: 'settings.foodSafety' })}
+                debouncedSaveProfile={debouncedSaveProfile}
+                saveProfileData={saveProfileData}
+                setUserProfile={setUserProfile}
+                household={household}
+                householdTitle={intl.formatMessage({ id: 'settings.household' })}
+                onShowHousehold={onShowHousehold}
+                openMemberPreferences={openMemberPreferences}
+                removeMemberFromHousehold={removeMemberFromHousehold}
+                householdName={householdName}
+                setHouseholdName={setHouseholdName}
+                isCreatingHousehold={isCreatingHousehold}
+                createHousehold={createHousehold}
+                manageHouseholdLabel={intl.formatMessage({ id: 'settings.manageHousehold' })}
+              />
+            </Suspense>
+          )}
 
-            {/* ── Account Hero Card ── */}
-            {user && !user.isGuest && (() => {
-              const tierLabel = isFamily ? 'Family' : isPremium ? 'Premium' : 'Free';
-              const tierColor = isFamily ? 'text-purple-500' : isPremium ? 'text-[var(--accent-color)]' : 'text-theme-secondary';
-              const householdCount = household?.members?.length ?? 0;
+          {activeCategory === 'subscription' && (
+            <Suspense fallback={null}>
+              <SettingsSubscriptionPage
+                user={user}
+                pantryItemCount={pantryItemCount}
+                isPremium={isPremium}
+                isFamily={isFamily}
+                household={household}
+                onUpgrade={() => {}}
+                onShowHousehold={onShowHousehold}
+                usageLimitsTitle={intl.formatMessage({ id: 'settings.usageLimits' })}
+                usageLimits={usageLimits}
+                subscriptionTitle={intl.formatMessage({ id: 'settings.subscription' })}
+              />
+            </Suspense>
+          )}
 
-              // Contextual CTA
-              const ctaContent = !isPremium && !isFamily
-                ? { icon: '⭐', text: 'Upgrade to Premium for AI recipes, unlimited saves & more', accent: true }
-                : !household
-                ? { icon: '👥', text: 'Invite family or roommates to share your pantry & shopping list', accent: false }
-                : null;
-
-              return (
-                <div className="rounded-2xl border overflow-hidden bg-theme-secondary border-theme shadow-sm">
-                  {/* Stat strip */}
-                  <div className="grid grid-cols-3 divide-x divide-theme">
-                    {[
-                      { value: pantryItemCount, label: 'Pantry Items', icon: '🥫' },
-                      { value: tierLabel,       label: 'Plan',         icon: '🏅', valueClass: tierColor },
-                      { value: householdCount || '—', label: 'Household', icon: '👥' },
-                    ].map(stat => (
-                      <div key={stat.label} className="flex flex-col items-center py-4 px-2 gap-0.5">
-                        <span className="text-lg">{stat.icon}</span>
-                        <span className={`text-xl font-black text-theme-primary ${stat.valueClass ?? ''}`}>{stat.value}</span>
-                        <span className="text-[10px] font-semibold uppercase tracking-wide text-theme-secondary opacity-60">{stat.label}</span>
-                      </div>
-                    ))}
-                  </div>
-
-                  {/* Contextual CTA */}
-                  {ctaContent && (
-                    <div className={`flex items-center gap-3 px-4 py-3 border-t ${
-                      ctaContent.accent
-                        ? 'border-[var(--accent-color)]/20 bg-[var(--accent-color)]/5'
-                        : 'border-theme bg-theme-primary'
-                    }`}>
-                      <span className="text-base shrink-0">{ctaContent.icon}</span>
-                      <p className="flex-1 text-xs text-theme-secondary leading-snug">{ctaContent.text}</p>
-                      <button
-                        onClick={ctaContent.accent ? () => setActiveCategory('account_info') : onShowHousehold}
-                        className={`shrink-0 text-xs font-bold px-3 py-1.5 rounded-lg transition-colors ${
-                          ctaContent.accent
-                            ? 'bg-[var(--accent-color)] text-[var(--accent-text,white)] hover:bg-[var(--accent-color)]/80'
-                            : 'bg-theme-secondary text-theme-primary border border-theme hover:bg-theme-primary'
-                        }`}
-                      >
-                        {ctaContent.accent ? 'Upgrade' : 'Invite'}
-                      </button>
-                    </div>
-                  )}
-                </div>
-              );
-            })()}
-
-            {/* Profile Section */}
-            {user && onLogout && !user.isGuest && (
-              <div className="bg-theme-secondary rounded-xl border border-theme overflow-hidden shadow-sm" data-section="profile">
-                <div className="w-full flex items-center justify-between p-4 border-b border-theme bg-theme-primary/20">
-                  <div className="flex items-center gap-3">
-                    <UserIcon className="w-5 h-5 text-[var(--accent-color)]" />
-                    <h3 className="font-semibold text-theme-primary">{intl.formatMessage({ id: 'settings.profile' })}</h3>
-                  </div>
-                </div>
-
-                <div className="p-4">
-                  {/* Avatar Section */}
-                  <div className="mb-4">
-                    <div className="flex items-center gap-4 mb-3">
-                      <div className="w-16 h-16 rounded-full overflow-hidden bg-gray-200 flex items-center justify-center border border-theme">
-                        {user.avatar ? (
-                          <img src={user.avatar} alt="Avatar" className="w-full h-full object-cover" />
-                        ) : (
-                          <div className="text-2xl text-gray-500">{user.name.charAt(0).toUpperCase()}</div>
-                        )}
-                      </div>
-                      <div className="flex-1">
-                        <p className="font-medium text-theme-primary">{userProfile?.name || user.name}</p>
-                        <p className="text-sm text-theme-secondary">{user.email}</p>
-                      </div>
-                    </div>
-                    
-                    <div className="flex gap-2 mb-4">
-                      <button
-                        onClick={() => setShowAvatarSelection(!showAvatarSelection)}
-                        className="bg-blue-500 text-white px-3 py-2 rounded text-sm font-medium hover:bg-blue-600 flex-1 text-center"
-                      >
-                        {showAvatarSelection ? 'Cancel' : 'Change Avatar'}
-                      </button>
-                      {user.avatar && (
-                        <button
-                          onClick={handleRemoveAvatar}
-                          disabled={updatingAvatar}
-                          className="bg-red-500 text-white px-3 py-2 rounded text-sm font-medium hover:bg-red-600 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
-                        >
-                          {updatingAvatar && <Loader2 className="w-4 h-4 animate-spin" />}
-                          {updatingAvatar ? 'Removing...' : 'Remove'}
-                        </button>
-                      )}
-                    </div>
-
-                    {showAvatarSelection && (
-                      <div className="mb-4">
-                        <h4 className="text-sm font-medium mb-2 text-theme-primary">{intl.formatMessage({ id: 'settings.chooseAvatar' })}</h4>
-                        <div className="grid grid-cols-5 gap-2 max-h-48 overflow-y-auto">
-                          {avatarOptions.map((avatarPath) => (
-                            <button
-                              key={avatarPath}
-                              onClick={() => handleAvatarSelect(avatarPath)}
-                              disabled={updatingAvatar}
-                              className="w-12 h-12 rounded-full overflow-hidden border-2 border-gray-300 hover:border-blue-500 transition-colors disabled:opacity-50 disabled:cursor-not-allowed relative"
-                            >
-                              <img
-                                src={avatarPath}
-                                alt={`Avatar ${avatarPath.split('/').pop()?.split('.')[0]}`}
-                                className="w-full h-full object-cover"
-                              />
-                              {updatingAvatar && (
-                                <div className="absolute inset-0 bg-black/50 flex items-center justify-center">
-                                  <Loader2 className="w-4 h-4 animate-spin text-white" />
-                                </div>
-                              )}
-                            </button>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-
-                    {/* Name Field */}
-                    <div className="mb-4">
-                      <label htmlFor="userName" className="block text-sm font-medium text-theme-primary mb-2">{intl.formatMessage({ id: 'settings.displayName' })}</label>
-                      <input
-                        id="userName"
-                        name="userName"
-                        type="text"
-                        value={userProfile?.name ?? user.name ?? ''}
-                        onChange={(e) => handleProfileChange('name', e.target.value)}
-                        placeholder="Enter your display name"
-                        className="w-full px-3 py-2 border border-theme rounded-lg bg-theme-primary text-theme-secondary placeholder-theme-secondary/50 focus:outline-none focus:ring-2 focus:ring-[var(--accent-color)] focus:border-transparent"
-                      />
-                      <p className="text-xs text-theme-secondary mt-1">This name will be used throughout the app to personalize your experience.</p>
-                    </div>
-                  </div>
-
-                  {/* Logout Button */}
-                  <div className="mb-4">
-                    <button
-                      onClick={onLogout}
-                      className="w-full bg-red-500 text-white px-4 py-2 rounded font-medium hover:bg-red-600"
-                    >
-                      Logout
-                    </button>
-                  </div>
-
-                  {/* User Profile Information */}
-                  <div className="space-y-4 mb-4">
-                    <h4 className="text-sm font-medium mb-3 text-theme-primary">{intl.formatMessage({ id: 'settings.personalInfo' })}</h4>
-                    
-                    <div className="grid grid-cols-3 gap-3">
-                      {/* Row 1: Height, Weight, Age */}
-                      <div className="flex flex-col items-center">
-                        {userProfile?.measurementSystem === 'Metric' ? (
-                          <div className="flex items-center border border-theme rounded-lg bg-white px-2 py-1 w-full focus-within:ring-2 focus-within:ring-[var(--accent-color)] focus-within:border-transparent">
-                            <input
-                              id="heightCm"
-                              name="heightCm"
-                              type="number"
-                              value={userProfile?.height ? Math.round(userProfile.height * 2.54) : ''}
-                              onChange={(e) => {
-                                const cm = parseFloat(e.target.value) || 0;
-                                handleProfileChange('height', Math.round(cm / 2.54));
-                              }}
-                              placeholder="175"
-                              className="w-full text-center text-sm font-semibold text-black bg-transparent outline-none border-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-                              min="0"
-                              max="300"
-                            />
-                            <span className="text-xs text-gray-500 font-medium ml-1">cm</span>
-                          </div>
-                        ) : (
-                          <div className="flex gap-1.5 w-full justify-center">
-                            <div className="flex items-center border border-theme rounded-lg bg-white px-2 py-1 w-1/2 focus-within:ring-2 focus-within:ring-[var(--accent-color)] focus-within:border-transparent">
-                              <input
-                                id="heightFeet"
-                                name="heightFeet"
-                                type="number"
-                                value={userProfile?.height ? Math.floor(userProfile.height / 12) : ''}
-                                onChange={(e) => {
-                                  const feet = parseInt(e.target.value) || 0;
-                                  const inches = userProfile?.height ? userProfile.height % 12 : 0;
-                                  handleProfileChange('height', feet * 12 + inches);
-                                }}
-                                placeholder="5"
-                                className="w-full text-center text-sm font-semibold text-black bg-transparent outline-none border-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-                                min="0"
-                                max="8"
-                              />
-                              <span className="text-xs text-gray-500 font-medium ml-1">ft</span>
-                            </div>
-                            <div className="flex items-center border border-theme rounded-lg bg-white px-2 py-1 w-1/2 focus-within:ring-2 focus-within:ring-[var(--accent-color)] focus-within:border-transparent">
-                              <input
-                                id="heightInches"
-                                name="heightInches"
-                                type="number"
-                                value={userProfile?.height ? userProfile.height % 12 : ''}
-                                onChange={(e) => {
-                                  const feet = userProfile?.height ? Math.floor(userProfile.height / 12) : 0;
-                                  const inches = parseInt(e.target.value) || 0;
-                                  handleProfileChange('height', feet * 12 + inches);
-                                }}
-                                placeholder="8"
-                                className="w-full text-center text-sm font-semibold text-black bg-transparent outline-none border-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-                                min="0"
-                                max="11"
-                              />
-                              <span className="text-xs text-gray-500 font-medium ml-1">in</span>
-                            </div>
-                          </div>
-                        )}
-                        <label className="text-[10px] text-theme-secondary font-bold uppercase tracking-wider mt-1.5 text-center">
-                          {intl.formatMessage({ id: 'settings.height' })}
-                        </label>
-                      </div>
-
-                      {/* Weight — lbs or kg */}
-                      <div className="flex flex-col items-center">
-                        <div className="flex items-center border border-theme rounded-lg bg-white px-2 py-1 w-full focus-within:ring-2 focus-within:ring-[var(--accent-color)] focus-within:border-transparent">
-                          <input
-                            id="weight"
-                            name="weight"
-                            type="number"
-                            min="0"
-                            value={
-                              userProfile?.measurementSystem === 'Metric'
-                                ? userProfile?.weight ? Math.round(userProfile.weight * 0.453592) : ''
-                                : userProfile?.weight || ''
-                            }
-                            onChange={(e) => {
-                              const val = parseFloat(e.target.value);
-                              if (isNaN(val)) { handleProfileChange('weight', undefined); return; }
-                              const lbs = userProfile?.measurementSystem === 'Metric' ? Math.round(val / 0.453592) : val;
-                              handleProfileChange('weight', lbs);
-                            }}
-                            placeholder={userProfile?.measurementSystem === 'Metric' ? '70' : '154'}
-                            className="w-full text-center text-sm font-semibold text-black bg-transparent outline-none border-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-                          />
-                          <span className="text-xs text-gray-500 font-medium ml-1">
-                            {userProfile?.measurementSystem === 'Metric' ? 'kg' : 'lbs'}
-                          </span>
-                        </div>
-                        <label htmlFor="weight" className="text-[10px] text-theme-secondary font-bold uppercase tracking-wider mt-1.5 text-center">
-                          {intl.formatMessage({ id: 'settings.weight' })}
-                        </label>
-                      </div>
-
-                      <div className="flex flex-col items-center">
-                        <div className="flex items-center border border-theme rounded-lg bg-white px-2 py-1 w-full focus-within:ring-2 focus-within:ring-[var(--accent-color)] focus-within:border-transparent">
-                          <input
-                            id="age"
-                            name="age"
-                            type="number"
-                            min="0"
-                            value={userProfile?.age || ''}
-                            onChange={(e) => handleProfileChange('age', e.target.value ? parseInt(e.target.value) : undefined)}
-                            placeholder="30"
-                            className="w-full text-center text-sm font-semibold text-black bg-transparent outline-none border-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-                          />
-                          <span className="text-xs text-gray-500 font-medium ml-1">yrs</span>
-                        </div>
-                        <label htmlFor="age" className="text-[10px] text-theme-secondary font-bold uppercase tracking-wider mt-1.5 text-center">
-                          Age
-                        </label>
-                      </div>
-
-                      {/* Row 2: Gender and Household Size */}
-                      <div className="col-span-2 flex flex-col items-center">
-                        <div className="w-full border border-theme rounded-lg bg-white px-2 py-1 focus-within:ring-2 focus-within:ring-[var(--accent-color)] focus-within:border-transparent">
-                          <select
-                            id="gender"
-                            name="gender"
-                            value={userProfile?.gender || ''}
-                            onChange={(e) => handleProfileChange('gender', e.target.value || undefined)}
-                            className="w-full text-center text-sm font-semibold text-black bg-transparent outline-none border-none cursor-pointer"
-                          >
-                            <option value="">{intl.formatMessage({ id: 'settings.selectGender' })}</option>
-                            <option value="male">{intl.formatMessage({ id: 'settings.genders.male' })}</option>
-                            <option value="female">{intl.formatMessage({ id: 'settings.genders.female' })}</option>
-                            <option value="other">{intl.formatMessage({ id: 'settings.genders.other' })}</option>
-                            <option value="prefer-not-to-say">{intl.formatMessage({ id: 'settings.genders.preferNotToSay' })}</option>
-                          </select>
-                        </div>
-                        <label htmlFor="gender" className="text-[10px] text-theme-secondary font-bold uppercase tracking-wider mt-1.5 text-center">
-                          {intl.formatMessage({ id: 'settings.gender' })}
-                        </label>
-                      </div>
-
-                      <div className="flex flex-col items-center">
-                        <div className="flex items-center border border-theme rounded-lg bg-white px-2 py-1 w-full focus-within:ring-2 focus-within:ring-[var(--accent-color)] focus-within:border-transparent">
-                          <input
-                            id="householdSize"
-                            name="householdSize"
-                            type="number"
-                            value={userProfile?.householdSize || ''}
-                            onChange={(e) => handleProfileChange('householdSize', e.target.value ? parseInt(e.target.value) : undefined)}
-                            placeholder="4"
-                            className="w-full text-center text-sm font-semibold text-black bg-transparent outline-none border-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-                            min="1"
-                            max="20"
-                          />
-                          <span className="text-xs text-gray-500 font-medium ml-1">people</span>
-                        </div>
-                        <label htmlFor="householdSize" className="text-[10px] text-theme-secondary font-bold uppercase tracking-wider mt-1.5 text-center">
-                          {intl.formatMessage({ id: 'settings.household' })}
-                        </label>
-                      </div>
-                    </div>
-
-                    <div className="grid grid-cols-2 gap-3 mt-4">
-                      <div>
-                        <label htmlFor="dietGoal" className="block text-xs text-theme-secondary mb-1">{intl.formatMessage({ id: 'settings.dietGoal' })}</label>
-                        <select
-                          id="dietGoal"
-                          name="dietGoal"
-                          value={userProfile?.dietGoal || ''}
-                          onChange={(e) => handleProfileChange('dietGoal', e.target.value || undefined)}
-                          className="w-full p-2 border rounded text-sm text-black bg-white"
-                        >
-                          <option value="">{intl.formatMessage({ id: 'settings.selectDietGoal' })}</option>
-                          <option value="lose-weight">{intl.formatMessage({ id: 'settings.dietGoals.loseWeight' })}</option>
-                          <option value="maintain-weight">{intl.formatMessage({ id: 'settings.dietGoals.maintainWeight' })}</option>
-                          <option value="gain-weight">{intl.formatMessage({ id: 'settings.dietGoals.gainWeight' })}</option>
-                          <option value="build-muscle">{intl.formatMessage({ id: 'settings.dietGoals.buildMuscle' })}</option>
-                          <option value="improve-health">{intl.formatMessage({ id: 'settings.dietGoals.improveHealth' })}</option>
-                        </select>
-                      </div>
-                      <div>
-                        <label htmlFor="activityLevel" className="block text-xs text-theme-secondary mb-1">{intl.formatMessage({ id: 'settings.activityLevel' })}</label>
-                        <select
-                          id="activityLevel"
-                          name="activityLevel"
-                          value={userProfile?.activityLevel || ''}
-                          onChange={(e) => handleProfileChange('activityLevel', e.target.value || undefined)}
-                          className="w-full p-2 border rounded text-sm text-black bg-white"
-                        >
-                          <option value="">{intl.formatMessage({ id: 'settings.selectActivityLevel' })}</option>
-                          <option value="sedentary">{intl.formatMessage({ id: 'settings.activityLevels.sedentary' })}</option>
-                          <option value="lightly-active">{intl.formatMessage({ id: 'settings.activityLevels.lightlyActive' })}</option>
-                          <option value="moderately-active">{intl.formatMessage({ id: 'settings.activityLevels.moderatelyActive' })}</option>
-                          <option value="very-active">{intl.formatMessage({ id: 'settings.activityLevels.veryActive' })}</option>
-                          <option value="extremely-active">{intl.formatMessage({ id: 'settings.activityLevels.extremelyActive' })}</option>
-                        </select>
-                      </div>
-                    </div>
-                  </div>
-
-                  {profileChanged && (
-                    <button
-                      onClick={saveProfile}
-                      disabled={savingProfile}
-                      className="w-full bg-green-500 text-white px-4 py-2 rounded text-sm font-medium hover:bg-green-600 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 mt-4"
-                    >
-                      {savingProfile && <Loader2 className="w-4 h-4 animate-spin" />}
-                      {savingProfile ? 'Saving...' : intl.formatMessage({ id: 'settings.saveProfile' })}
-                    </button>
-                  )}
-                </div>
-
-              </div>
-            )}
-
-            <SettingsUsageLimitsSection
-              userExists={!!user}
-              title={intl.formatMessage({ id: 'settings.usageLimits' })}
-              isPremium={isPremium}
-              isFamily={isFamily}
-              usageLimits={usageLimits}
-              onOpenUpgrade={() => setActiveCategory('subscription')}
-            />
-
-            <SettingsHouseholdSection
-              user={user}
-              household={household}
-              title={intl.formatMessage({ id: 'settings.household' })}
-              onShowHousehold={onShowHousehold}
-              openMemberPreferences={openMemberPreferences}
-              removeMemberFromHousehold={removeMemberFromHousehold}
-              householdName={householdName}
-              setHouseholdName={setHouseholdName}
-              isCreatingHousehold={isCreatingHousehold}
-              createHousehold={createHousehold}
-              manageHouseholdLabel={intl.formatMessage({ id: 'settings.manageHousehold' })}
-            />
-          </>}
-
-          {activeCategory === 'preferences' && <>
-            <SettingsThemeSection
-              title={intl.formatMessage({ id: 'settings.themeSettings' })}
-              settings={settings}
-              onResetTheme={() => {
-                setSettings((previous) => ({
+          {activeCategory === 'preferences' && (
+            <Suspense fallback={null}>
+              <SettingsPreferencesPage
+                user={user}
+                userProfile={userProfile}
+                settings={settings}
+                setSettings={setSettings}
+                themeSectionTitle={intl.formatMessage({ id: 'settings.themeSettings' })}
+                onResetTheme={() => {
+                  setSettings((previous) => ({
+                    ...previous,
+                    theme: {
+                      mode: 'dark',
+                      accentColor: '#4CAF50',
+                      backgroundColor: undefined,
+                      textColor: undefined,
+                    },
+                  }));
+                }}
+                onThemeModeChange={(mode) => handleChange('theme', { mode })}
+                onAccentColorChange={(accentColor) => handleChange('theme', { accentColor })}
+                onBackgroundColorChange={(backgroundColor) => handleChange('theme', { backgroundColor })}
+                onTextColorChange={(textColor) => handleChange('theme', { textColor })}
+                themeLabels={{
+                  theme: intl.formatMessage({ id: 'settings.theme' }),
+                  accent: intl.formatMessage({ id: 'settings.accent' }),
+                  background: intl.formatMessage({ id: 'settings.background' }),
+                  textColor: intl.formatMessage({ id: 'settings.textColor' }),
+                  language: intl.formatMessage({ id: 'settings.language' }),
+                  dark: intl.formatMessage({ id: 'settings.themes.dark' }),
+                  light: intl.formatMessage({ id: 'settings.themes.light' }),
+                }}
+                onMeasurementSystemChange={(value) => handleProfileChange('measurementSystem', value)}
+                onCurrencyChange={(value) => { handleProfileChange('currency', value); setActiveCurrency(value); }}
+                geminiOptedIn={geminiOptedIn}
+                onGeminiOptInChange={handleGeminiOptIn}
+                appPreferencesSectionTitle={intl.formatMessage({ id: 'settings.appPreferences' })}
+                appPreferencesLabels={{
+                  enableNotifications: intl.formatMessage({ id: 'settings.enableNotifications' }),
+                  measurementSystem: intl.formatMessage({ id: 'settings.measurementSystem' }),
+                  currency: 'Currency',
+                  enableAiFeatures: intl.formatMessage({ id: 'settings.enableAiFeatures' }),
+                  includeStaples: intl.formatMessage({ id: 'settings.includeStaples' }),
+                  autoRestockStaples: intl.formatMessage({ id: 'settings.autoRestockStaples' }),
+                  showNutrition: intl.formatMessage({ id: 'settings.showNutrition' }),
+                  showPriceData: intl.formatMessage({ id: 'settings.showPriceData' }),
+                }}
+                onTabVisibilityChange={(tab, isVisible) => {
+                  const hidden = settings.navigation?.hiddenTabs ?? [];
+                  const newHidden = isVisible ? hidden.filter((currentTab: string) => currentTab !== tab) : [...hidden, tab];
+                  setSettings((previous) => ({
+                    ...previous,
+                    navigation: { ...previous.navigation, hiddenTabs: newHidden },
+                  }));
+                }}
+                storeLayoutTitle={intl.formatMessage({ id: 'settings.storeLayout' })}
+                defaultStoreLayout={defaultStoreLayout}
+                onStoreLayoutChange={(newLayout) => setSettings((previous) => ({
                   ...previous,
-                  theme: {
-                    mode: 'dark',
-                    accentColor: '#4CAF50',
-                    backgroundColor: undefined,
-                    textColor: undefined,
+                  shopping: {
+                    ...previous.shopping,
+                    storeLayout: newLayout,
                   },
-                }));
-              }}
-              onThemeModeChange={(mode) => handleChange('theme', { mode })}
-              onAccentColorChange={(accentColor) => handleChange('theme', { accentColor })}
-              onBackgroundColorChange={(backgroundColor) => handleChange('theme', { backgroundColor })}
-              onTextColorChange={(textColor) => handleChange('theme', { textColor })}
-              labels={{
-                theme: intl.formatMessage({ id: 'settings.theme' }),
-                accent: intl.formatMessage({ id: 'settings.accent' }),
-                background: intl.formatMessage({ id: 'settings.background' }),
-                textColor: intl.formatMessage({ id: 'settings.textColor' }),
-                language: intl.formatMessage({ id: 'settings.language' }),
-                dark: intl.formatMessage({ id: 'settings.themes.dark' }),
-                light: intl.formatMessage({ id: 'settings.themes.light' }),
-              }}
-            />
-
-            <SettingsAppPreferencesSection
-              title={intl.formatMessage({ id: 'settings.appPreferences' })}
-              settings={settings}
-              setSettings={setSettings}
-              userProfile={userProfile}
-              onMeasurementSystemChange={(value) => handleProfileChange('measurementSystem', value)}
-              onCurrencyChange={(value) => { handleProfileChange('currency', value); setActiveCurrency(value); }}
-              geminiOptedIn={geminiOptedIn}
-              onGeminiOptInChange={handleGeminiOptIn}
-              labels={{
-                enableNotifications: intl.formatMessage({ id: 'settings.enableNotifications' }),
-                measurementSystem: intl.formatMessage({ id: 'settings.measurementSystem' }),
-                currency: 'Currency',
-                enableAiFeatures: intl.formatMessage({ id: 'settings.enableAiFeatures' }),
-                includeStaples: intl.formatMessage({ id: 'settings.includeStaples' }),
-                autoRestockStaples: intl.formatMessage({ id: 'settings.autoRestockStaples' }),
-                showNutrition: intl.formatMessage({ id: 'settings.showNutrition' }),
-                showPriceData: intl.formatMessage({ id: 'settings.showPriceData' }),
-              }}
-            />
-
-            <SettingsTabVisibilitySection
-              hiddenTabs={settings.navigation?.hiddenTabs}
-              onTabVisibilityChange={(tab, isVisible) => {
-                const hidden = settings.navigation?.hiddenTabs ?? [];
-                const newHidden = isVisible ? hidden.filter((currentTab: string) => currentTab !== tab) : [...hidden, tab];
-                setSettings((previous) => ({
+                }))}
+                onStoreProfilesChange={(profiles, active) => setSettings((previous) => ({
                   ...previous,
-                  navigation: { ...previous.navigation, hiddenTabs: newHidden },
-                }));
-              }}
-            />
+                  shopping: {
+                    ...previous.shopping,
+                    storeProfiles: profiles,
+                    activeStoreProfile: active,
+                  },
+                }))}
+                categoriesTitle={intl.formatMessage({ id: 'settings.categories' })}
+                customCategoryCount={customCategories.length}
+                onManageCategories={() => setShowCategoryManager(true)}
+                pantryImagesTitle={intl.formatMessage({ id: 'settings.pantryImages' })}
+                updatingBulkImages={updatingBulkImages}
+                onBulkUpdate={handleBulkImageUpdate}
+              />
+            </Suspense>
+          )}
 
-            <SettingsFoodSafetySection
-              title={intl.formatMessage({ id: 'settings.foodSafety' })}
-              user={user}
-              userProfile={userProfile}
-              setUserProfile={setUserProfile}
-              debouncedSaveProfile={debouncedSaveProfile}
-              saveProfileData={saveProfileData}
-            />
+          {activeCategory === 'notifications' && (
+            <Suspense fallback={null}>
+              <SettingsNotificationsPage
+                title={intl.formatMessage({ id: 'settings.notifications' })}
+                pendingTitle={intl.formatMessage({ id: 'settings.pendingNotifications' })}
+                user={user}
+                notificationSettings={notificationSettings}
+                setNotificationSettings={handleNotificationSettingsChange}
+              />
+            </Suspense>
+          )}
 
-            <SettingsCategoriesSection
-              userExists={!!user}
-              title={intl.formatMessage({ id: 'settings.categories' })}
-              customCategoryCount={customCategories.length}
-              onManageCategories={() => setShowCategoryManager(true)}
-            />
+          {activeCategory === 'food_waste' && (
+            <Suspense fallback={null}>
+              <SettingsFoodWastePage
+                userId={user?.id}
+                householdId={household?.id}
+                title={intl.formatMessage({ id: 'settings.leftoverAnalytics' })}
+              />
+            </Suspense>
+          )}
 
-            <SettingsStoreLayoutSection
-              userExists={!!user}
-              title={intl.formatMessage({ id: 'settings.storeLayout' })}
-              storeLayout={settings.shopping?.storeLayout || defaultStoreLayout}
-              onStoreLayoutChange={(newLayout) => setSettings((previous) => ({
-                ...previous,
-                shopping: {
-                  ...previous.shopping,
-                  storeLayout: newLayout,
-                },
-              }))}
-              storeProfiles={settings.shopping?.storeProfiles ?? {}}
-              activeStoreProfile={settings.shopping?.activeStoreProfile}
-              onStoreProfilesChange={(profiles, active) => setSettings((previous) => ({
-                ...previous,
-                shopping: {
-                  ...previous.shopping,
-                  storeProfiles: profiles,
-                  activeStoreProfile: active,
-                },
-              }))}
-            />
-
-            <SettingsPantryImagesSection
-              user={user}
-              title={intl.formatMessage({ id: 'settings.pantryImages' })}
-              updatingBulkImages={updatingBulkImages}
-              onBulkUpdate={handleBulkImageUpdate}
-            />
-
-            <SettingsResetUsageSection
-              isAdmin={isAdmin}
-              onReset={handleResetUsageCounters}
-            />
-
-            <SettingsRemoteConfigDebugSection
-              isAdmin={isAdmin}
-              addToast={addToast}
-            />
-          </>}
-
-          {activeCategory === 'subscription' && <>
-            <SettingsSubscriptionSection
-              user={user}
-              title={intl.formatMessage({ id: 'settings.subscription' })}
-            />
-          </>}
-
-          {activeCategory === 'notifications' && <>
-            <SettingsNotificationsSection
-              title={intl.formatMessage({ id: 'settings.notifications' })}
-              user={user}
-              notificationSettings={notificationSettings}
-              setNotificationSettings={handleNotificationSettingsChange}
-            />
-
-            <SettingsPendingNotificationsSection
-              user={user}
-              title={intl.formatMessage({ id: 'settings.pendingNotifications' })}
-            />
-          </>}
-
-          {activeCategory === 'food_waste' && <>
-            <SettingsLeftoverAnalyticsSection
-              userId={user?.id}
-              householdId={household?.id}
-              title={intl.formatMessage({ id: 'settings.leftoverAnalytics' })}
-            />
-          </>}
-
-          {activeCategory === 'contact_us' && <>
-            <SettingsFeedbackSection
-              title={intl.formatMessage({ id: 'settings.feedback' })}
-              feedback={feedback}
-              setFeedback={setFeedback}
-              sending={sending}
-              onSubmit={handleFeedbackSubmit}
-            />
-
-            <SettingsPrivacyLegalSection
-              title={intl.formatMessage({ id: 'settings.privacy' })}
-              onViewPrivacyPolicy={() => {
-                const privacyUrl = (window as Window & { PRIVACY_POLICY_URL?: string }).PRIVACY_POLICY_URL || 'https://stock-spoon-website.firebaseapp.com/privacy.html';
-                window.open(privacyUrl, '_blank');
-              }}
-              onViewTermsOfService={() => {
-                const termsUrl = (window as Window & { TERMS_OF_SERVICE_URL?: string }).TERMS_OF_SERVICE_URL || 'https://stock-spoon-website.firebaseapp.com/terms.html';
-                window.open(termsUrl, '_blank');
-              }}
-              onCopyPrivacyUrl={() => {
-                const privacyUrl = (window as Window & { PRIVACY_POLICY_URL?: string }).PRIVACY_POLICY_URL || 'https://stock-spoon-website.firebaseapp.com/privacy.html';
-                if (navigator.clipboard) navigator.clipboard.writeText(privacyUrl);
-                addToast?.('Privacy policy URL copied to clipboard', 'success');
-              }}
-              canDeleteAccount={!!user && !user.isGuest}
-              onDeleteAccount={() => setShowDeleteConfirm(true)}
-            />
-          </>}
-
-          {activeCategory === 'help' && (
-            <SettingsHelpSection
-              title="Help"
-              description="App documentation, guides, and FAQs"
-              onOpenFAQ={() => setShowFAQModal(true)}
-              buttonLabel="Open Help & FAQ"
-            />
+          {activeCategory === 'help_and_support' && (
+            <Suspense fallback={null}>
+              <SettingsHelpAndSupportPage
+                helpTitle="Help"
+                helpDescription="App documentation, guides, and FAQs"
+                onOpenFAQ={() => setShowFAQModal(true)}
+                feedbackTitle={intl.formatMessage({ id: 'settings.feedback' })}
+                feedback={feedback}
+                setFeedback={setFeedback}
+                sending={sending}
+                onSubmitFeedback={handleFeedbackSubmit}
+                privacyTitle={intl.formatMessage({ id: 'settings.privacy' })}
+                onViewPrivacyPolicy={() => {
+                  const privacyUrl = (window as Window & { PRIVACY_POLICY_URL?: string }).PRIVACY_POLICY_URL || 'https://stock-spoon-website.firebaseapp.com/privacy.html';
+                  window.open(privacyUrl, '_blank');
+                }}
+                onViewTermsOfService={() => {
+                  const termsUrl = (window as Window & { TERMS_OF_SERVICE_URL?: string }).TERMS_OF_SERVICE_URL || 'https://stock-spoon-website.firebaseapp.com/terms.html';
+                  window.open(termsUrl, '_blank');
+                }}
+                onCopyPrivacyUrl={() => {
+                  const privacyUrl = (window as Window & { PRIVACY_POLICY_URL?: string }).PRIVACY_POLICY_URL || 'https://stock-spoon-website.firebaseapp.com/privacy.html';
+                  if (navigator.clipboard) navigator.clipboard.writeText(privacyUrl);
+                  addToast?.('Privacy policy URL copied to clipboard', 'success');
+                }}
+                canDeleteAccount={!!user && !user.isGuest}
+                onDeleteAccount={() => setShowDeleteConfirm(true)}
+                onReplayOnboarding={onReplayOnboarding}
+              />
+            </Suspense>
           )}
 
           {activeCategory === 'admin_analytics' && isAdmin && (
-            <div className="space-y-4">
-              <div className="flex gap-2 bg-theme-secondary border border-theme rounded-xl p-1">
-                <button
-                  onClick={() => setAdminDashboardTab('monitoring')}
-                  className={`flex-1 py-2 px-3 rounded-lg text-sm font-semibold transition-colors ${adminDashboardTab === 'monitoring' ? 'bg-[var(--accent-color)] text-[var(--accent-text,white)]' : 'text-theme-secondary hover:text-theme-primary'}`}
-                >
-                  Monitoring
-                </button>
-                <button
-                  onClick={() => setAdminDashboardTab('performance')}
-                  className={`flex-1 py-2 px-3 rounded-lg text-sm font-semibold transition-colors ${adminDashboardTab === 'performance' ? 'bg-[var(--accent-color)] text-[var(--accent-text,white)]' : 'text-theme-secondary hover:text-theme-primary'}`}
-                >
-                  Performance
-                </button>
-                <button
-                  onClick={() => setAdminDashboardTab('behavior')}
-                  className={`flex-1 py-2 px-3 rounded-lg text-sm font-semibold transition-colors ${adminDashboardTab === 'behavior' ? 'bg-[var(--accent-color)] text-[var(--accent-text,white)]' : 'text-theme-secondary hover:text-theme-primary'}`}
-                >
-                  User Behavior
-                </button>
-              </div>
-
-              {adminDashboardTab === 'monitoring' && <MonitoringDashboard user={user ?? null} />}
-              {adminDashboardTab === 'performance' && <PerformanceMonitoringDashboard inline={true} />}
-              {adminDashboardTab === 'behavior' && <UserBehaviorAnalytics />}
-            </div>
+            <Suspense fallback={null}>
+              <SettingsAdminPage
+                user={user}
+                onResetUsage={handleResetUsageCounters}
+                addToast={addToast}
+              />
+            </Suspense>
           )}
 
-          {activeCategory === 'update' && <>
-            <SettingsAppUpdatesSection
-              title={intl.formatMessage({ id: 'settings.appUpdates' })}
-            />
-          </>}
+          {activeCategory === 'update' && (
+            <Suspense fallback={null}>
+              <SettingsUpdatePage
+                title={intl.formatMessage({ id: 'settings.appUpdates' })}
+              />
+            </Suspense>
+          )}
         </div>
       )}
 
@@ -1492,279 +870,42 @@ const SettingsComponent: React.FC = () => {
 
       {/* Member Preferences Modal */}
       {showMemberPreferencesModal && selectedMember && (
-        <div className="fixed inset-0 bg-black/50 z-[100] flex items-center justify-center p-4" onClick={() => setShowMemberPreferencesModal(false)}>
-          <div className="bg-theme-primary rounded-2xl shadow-2xl max-w-lg w-full h-[80vh] max-h-[600px] flex flex-col" onClick={e => e.stopPropagation()}>
-            <div className="flex-shrink-0 p-4 border-b border-theme bg-theme-secondary">
-              <div className="flex justify-between items-center">
-                <div className="flex items-center gap-2 flex-1 min-w-0">
-                  <SettingsIcon className="w-5 h-5 text-theme-primary flex-shrink-0" />
-                  <h2 className="font-serif font-bold text-theme-primary text-lg truncate">{selectedMember.name}'s Preferences</h2>
-                </div>
-                <button onClick={() => setShowMemberPreferencesModal(false)} className="text-theme-secondary hover:text-theme-primary flex-shrink-0 ml-2">
-                  <X className="w-6 h-6" />
-                </button>
-              </div>
-            </div>
-
-            <div className="flex-1 p-6 overflow-y-auto min-h-0">
-              <div className="space-y-6">
-                {/* Dietary Restrictions */} 
-                <div>
-                  <label className="block text-sm font-medium text-theme-primary mb-3 flex items-center gap-2">
-                    <AlertTriangle className="w-4 h-4" />
-                    Dietary Restrictions
-                  </label>
-                  <div className="grid grid-cols-2 gap-3">
-                    {['Vegetarian', 'Vegan', 'Gluten-Free', 'Dairy-Free', 'Keto', 'Paleo', 'Low-Carb', 'Halal', 'Kosher'].map((restriction) => (
-                      <label key={restriction} className="flex items-center gap-2 text-sm">
-                        <input
-                          type="checkbox"
-                          checked={memberPreferences.dietaryRestrictions?.includes(restriction) || false}
-                          onChange={(e) => {
-                            const current = memberPreferences.dietaryRestrictions || [];
-                            if (e.target.checked) {
-                              setMemberPreferences(prev => ({
-                                ...prev,
-                                dietaryRestrictions: [...current, restriction]
-                              }));
-                            } else {
-                              setMemberPreferences(prev => ({
-                                ...prev,
-                                dietaryRestrictions: current.filter(r => r !== restriction)
-                              }));
-                            }
-                          }}
-                          className="rounded border-theme text-theme-primary focus:border-theme-primary"
-                        />
-                        {restriction}
-                      </label>
-                    ))}
-                  </div>
-                </div>
-
-                {/* Allergies */}
-                <div>
-                  <label className="block text-sm font-medium text-theme-primary mb-3">Allergies</label>
-                  <div className="grid grid-cols-2 gap-3">
-                    {['Peanuts', 'Tree Nuts', 'Dairy', 'Eggs', 'Soy', 'Wheat', 'Fish', 'Shellfish', 'Sesame', 'Mustard'].map((allergy) => (
-                      <label key={allergy} className="flex items-center gap-2 text-sm">
-                        <input
-                          type="checkbox"
-                          checked={memberPreferences.allergies?.includes(allergy) || false}
-                          onChange={(e) => {
-                            const current = memberPreferences.allergies || [];
-                            if (e.target.checked) {
-                              setMemberPreferences(prev => ({
-                                ...prev,
-                                allergies: [...current, allergy]
-                              }));
-                            } else {
-                              setMemberPreferences(prev => ({
-                                ...prev,
-                                allergies: current.filter(a => a !== allergy)
-                              }));
-                            }
-                          }}
-                          className="rounded border-theme text-theme-primary focus:border-theme-primary"
-                        />
-                        {allergy}
-                      </label>
-                    ))}
-                  </div>
-                </div>
-
-                {/* Diet Goal */}
-                <div>
-                  <label className="block text-sm font-medium text-theme-primary mb-3">Diet Goal</label>
-                  <select
-                    value={memberPreferences.dietGoal || ''}
-                    onChange={(e) => setMemberPreferences(prev => ({ ...prev, dietGoal: e.target.value as UserProfile['dietGoal'] || undefined }))}
-                    className="w-full bg-theme-secondary border border-theme rounded-lg px-3 py-2 text-sm text-theme-primary focus:border-theme-primary outline-none"
-                  >
-                    <option value="">No specific goal</option>
-                    <option value="lose-weight">Lose Weight</option>
-                    <option value="maintain-weight">Maintain Weight</option>
-                    <option value="gain-weight">Gain Weight</option>
-                    <option value="build-muscle">Build Muscle</option>
-                    <option value="improve-health">Improve Health</option>
-                  </select>
-                </div>
-
-                {/* Favorite Cuisines */}
-                <div>
-                  <label className="block text-sm font-medium text-theme-primary mb-3 flex items-center gap-2">
-                    <Heart className="w-4 h-4" />
-                    Favorite Cuisines
-                  </label>
-                  <div className="grid grid-cols-2 gap-3">
-                    {['Italian', 'Mexican', 'Chinese', 'Japanese', 'Indian', 'Thai', 'French', 'Mediterranean', 'American', 'Korean'].map((cuisine) => (
-                      <label key={cuisine} className="flex items-center gap-2 text-sm">
-                        <input
-                          type="checkbox"
-                          checked={memberPreferences.favoriteCuisines?.includes(cuisine) || false}
-                          onChange={(e) => {
-                            const current = memberPreferences.favoriteCuisines || [];
-                            if (e.target.checked) {
-                              setMemberPreferences(prev => ({
-                                ...prev,
-                                favoriteCuisines: [...current, cuisine]
-                              }));
-                            } else {
-                              setMemberPreferences(prev => ({
-                                ...prev,
-                                favoriteCuisines: current.filter(c => c !== cuisine)
-                              }));
-                            }
-                          }}
-                          className="rounded border-theme text-theme-primary focus:border-theme-primary"
-                        />
-                        {cuisine}
-                      </label>
-                    ))}
-                  </div>
-                </div>
-
-                {/* Special Needs */}
-                <div>
-                  <label className="block text-sm font-medium text-theme-primary mb-3">Special Dietary Needs</label>
-                  <textarea
-                    value={memberPreferences.specialNeeds || ''}
-                    onChange={(e) => setMemberPreferences(prev => ({ ...prev, specialNeeds: e.target.value }))}
-                    placeholder="e.g., low sodium, diabetic friendly, etc."
-                    className="w-full bg-theme-secondary border border-theme rounded-lg px-3 py-2 text-sm text-theme-primary focus:border-theme-primary outline-none resize-none"
-                    rows={2}
-                  />
-                </div>
-
-                {/* Preferred Proteins */}
-                <div>
-                  <label className="block text-sm font-medium text-theme-primary mb-3">Preferred Proteins</label>
-                  <div className="grid grid-cols-2 gap-3">
-                    {['Chicken', 'Beef', 'Pork', 'Fish', 'Tofu', 'Beans', 'Eggs', 'Turkey', 'Lamb', 'Shrimp'].map((protein) => (
-                      <label key={protein} className="flex items-center gap-2 text-sm">
-                        <input
-                          type="checkbox"
-                          checked={memberPreferences.preferredProteins?.includes(protein) || false}
-                          onChange={(e) => {
-                            const current = memberPreferences.preferredProteins || [];
-                            if (e.target.checked) {
-                              setMemberPreferences(prev => ({
-                                ...prev,
-                                preferredProteins: [...current, protein]
-                              }));
-                            } else {
-                              setMemberPreferences(prev => ({
-                                ...prev,
-                                preferredProteins: current.filter(p => p !== protein)
-                              }));
-                            }
-                          }}
-                          className="rounded border-theme text-theme-primary focus:border-theme-primary"
-                        />
-                        {protein}
-                      </label>
-                    ))}
-                  </div>
-                </div>
-
-                {/* Disliked Ingredients */}
-                <div>
-                  <label className="block text-sm font-medium text-theme-primary mb-3">Disliked Ingredients</label>
-                  <input
-                    type="text"
-                    value={memberPreferences.dislikedIngredients?.join(', ') || ''}
-                    onChange={(e) => setMemberPreferences(prev => ({
-                      ...prev,
-                      dislikedIngredients: e.target.value.split(',').map(s => s.trim()).filter(s => s.length > 0)
-                    }))}
-                    placeholder="e.g., mushrooms, olives, cilantro"
-                    className="w-full bg-theme-secondary border border-theme rounded-lg px-3 py-2 text-sm text-theme-primary focus:border-theme-primary outline-none"
-                  />
-                </div>
-              </div>
-            </div>
-
-            <div className="p-4 border-t border-theme bg-theme-secondary">
-              <div className="flex gap-3">
-                <button
-                  onClick={() => setShowMemberPreferencesModal(false)}
-                  className="flex-1 bg-theme-primary hover:bg-theme-secondary text-theme-secondary hover:text-theme-primary py-2 px-4 rounded-lg font-medium transition-colors"
-                >
-                  Cancel
-                </button>
-                <button
-                  onClick={saveMemberPreferences}
-                  disabled={savingMemberPrefs}
-                  className="flex-1 bg-theme-secondary hover:bg-theme-primary text-theme-primary hover:text-theme-secondary py-2 px-4 rounded-lg font-medium transition-colors disabled:opacity-50"
-                >
-                  {savingMemberPrefs ? 'Saving...' : 'Save Preferences'}
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
+        <Suspense fallback={null}>
+          <SettingsMemberPreferencesModal
+            selectedMember={selectedMember}
+            memberPreferences={memberPreferences}
+            setMemberPreferences={setMemberPreferences}
+            savingMemberPrefs={savingMemberPrefs}
+            onClose={() => setShowMemberPreferencesModal(false)}
+            onSave={saveMemberPreferences}
+          />
+        </Suspense>
       )}
 
 
 
     {/* FAQ Modal */}
     {showFAQModal && (
-      <div className="fixed inset-0 bg-black/50 z-[100] flex items-center justify-center p-4">
-        <div className="bg-theme-primary rounded-2xl shadow-2xl max-w-4xl w-full h-[90vh] max-h-[800px] flex flex-col">
-          <div className="flex-shrink-0 p-4 border-b border-theme bg-theme-secondary">
-            <div className="flex justify-between items-center">
-              <div className="flex items-center gap-2 flex-1 min-w-0">
-                <SettingsIcon className="w-5 h-5 text-theme-primary flex-shrink-0" />
-                <h2 className="font-serif font-bold text-theme-primary text-lg truncate">Help & FAQ</h2>
-              </div>
-              <button onClick={() => setShowFAQModal(false)} className="text-theme-secondary hover:text-theme-primary flex-shrink-0 ml-2">
-                <X className="w-6 h-6" />
-              </button>
-            </div>
-          </div>
-
-          <div className="flex-1 p-6 overflow-y-auto min-h-0">
-            <FAQPage 
-              onBack={() => setShowFAQModal(false)} 
-              onNavigateToFeedback={() => {
-                setShowFAQModal(false);
-                setActiveCategory('contact_us');
-              }}
-            />
-          </div>
-        </div>
-      </div>
+      <Suspense fallback={null}>
+        <SettingsFAQModal
+          onClose={() => setShowFAQModal(false)}
+          onNavigateToFeedback={() => {
+            setShowFAQModal(false);
+            setActiveCategory('help_and_support');
+          }}
+        />
+      </Suspense>
     )}
 
     {/* Delete Account Confirmation Modal */}
     {showDeleteConfirm && (
-      <div className="fixed inset-0 bg-black/60 z-[110] flex items-center justify-center p-4">
-        <div className="bg-theme-primary rounded-2xl shadow-2xl max-w-sm w-full p-6 flex flex-col gap-4">
-          <div className="flex items-center gap-3">
-            <AlertTriangle className="w-6 h-6 text-red-500 flex-shrink-0" />
-            <h2 className="font-serif font-bold text-theme-primary text-lg">Delete Account</h2>
-          </div>
-          <p className="text-sm text-theme-secondary leading-relaxed">
-            This will <strong>permanently delete</strong> your account, all pantry data, meal plans, saved recipes, and remove you from any households. This action cannot be undone.
-          </p>
-          <div className="flex gap-3 mt-2">
-            <button
-              onClick={() => setShowDeleteConfirm(false)}
-              disabled={isDeletingAccount}
-              className="flex-1 bg-theme-secondary text-theme-primary py-2 px-4 rounded-lg font-medium text-sm transition-colors hover:bg-theme-primary disabled:opacity-50"
-            >
-              Cancel
-            </button>
-            <button
-              onClick={handleDeleteAccount}
-              disabled={isDeletingAccount}
-              className="flex-1 bg-red-500 text-white py-2 px-4 rounded-lg font-medium text-sm transition-colors hover:bg-red-600 disabled:opacity-50 flex items-center justify-center gap-2"
-            >
-              {isDeletingAccount ? <><Loader2 className="w-4 h-4 animate-spin" /> Deleting…</> : 'Delete My Account'}
-            </button>
-          </div>
-        </div>
-      </div>
+      <Suspense fallback={null}>
+        <SettingsDeleteAccountModal
+          isDeletingAccount={isDeletingAccount}
+          onCancel={() => setShowDeleteConfirm(false)}
+          onConfirm={handleDeleteAccount}
+        />
+      </Suspense>
     )}
 
     </>

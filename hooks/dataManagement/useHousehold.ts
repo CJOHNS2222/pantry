@@ -151,7 +151,7 @@ export function useHousehold(
         try {
           const profile = JSON.parse(localStorage.getItem('guestProfile') || '{}');
           profile.riskLevel = level;
-          profile.sensitiveGroups = !!sensitive;
+          profile.sensitiveHealthMode = !!sensitive;
           localStorage.setItem('guestProfile', JSON.stringify(profile));
         } catch (_e) {
           log.warn('Could not save guest risk profile to local storage', {}, 'DataManagement');

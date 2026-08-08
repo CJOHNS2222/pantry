@@ -419,9 +419,11 @@ export const AppGlobalModals: React.FC<AppGlobalModalsProps> = ({
           <DatabaseAnalytics />
         </Suspense>
       )}
-      <Suspense fallback={null}>
-        <GeminiTokenDebugger isAdmin={isAdmin} />
-      </Suspense>
+      {isAdmin && (
+        <Suspense fallback={null}>
+          <GeminiTokenDebugger isAdmin={isAdmin} />
+        </Suspense>
+      )}
 
       <canvas
         ref={modals.fireworksCanvasRef}
