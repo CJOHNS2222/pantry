@@ -31,6 +31,7 @@ import React, {
   useRef,
   useState,
 } from 'react';
+import { useIntl } from 'react-intl';
 import { Modal, ModalBody, ModalFooter } from './Modal';
 import { Button } from './Button';
 import { AlertTriangle, Trash2, CheckCircle2, HelpCircle } from 'lucide-react';
@@ -99,6 +100,18 @@ export const ConfirmDialogProvider: React.FC<{ children?: React.ReactNode }> = (
   const [pending, setPending] = useState<PendingConfirm | null>(null);
   const resolverRef = useRef<ConfirmResolver | null>(null);
 
+  let defaultCancel = 'Cancel';
+  let defaultConfirm = 'Confirm';
+  try {
+    const intl = useIntl();
+    if (intl) {
+      defaultCancel = intl.formatMessage({ id: 'common.cancel', defaultMessage: 'Cancel' });
+      defaultConfirm = intl.formatMessage({ id: 'common.confirm', defaultMessage: 'Confirm' });
+    }
+  } catch {
+    // Fallback if rendered outside IntlProvider
+  }
+
   const confirm = useCallback((options: ConfirmOptions): Promise<boolean> => {
     return new Promise((resolve) => {
       resolverRef.current = resolve;
@@ -166,7 +179,7 @@ export const ConfirmDialogProvider: React.FC<{ children?: React.ReactNode }> = (
             onClick={() => handleClose(false)}
             autoFocus={variant === 'danger'}
           >
-            {options?.cancelLabel ?? 'Cancel'}
+            {options?.cancelLabel ?? defaultCancel}
           </Button>
           <Button
             variant={config.buttonVariant}
@@ -174,7 +187,7 @@ export const ConfirmDialogProvider: React.FC<{ children?: React.ReactNode }> = (
             onClick={() => handleClose(true)}
             autoFocus={variant !== 'danger'}
           >
-            {options?.confirmLabel ?? 'Confirm'}
+            {options?.confirmLabel ?? defaultConfirm}
           </Button>
         </ModalFooter>
       </Modal>

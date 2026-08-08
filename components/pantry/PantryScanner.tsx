@@ -41,6 +41,7 @@ import { usePantryFilterSort, DisplayedPantryItem } from './usePantryFilterSort'
 import { usePantryQuickConsume } from './usePantryQuickConsume';
 import { PantryItemRow } from './PantryItemRow';
 import { PantryItemTile } from './PantryItemTile';
+import { VirtualizedPantryItemList, VIRTUALIZE_THRESHOLD } from './VirtualizedPantryItemList';
 import { PantryBulkActionBar } from './PantryBulkActionBar';
 import { PantrySearchBar } from './PantrySearchBar';
 import StorageLocationIndicator from './StorageLocationIndicator';
@@ -690,20 +691,32 @@ const PantryScannerComponent: React.FC = () => {
                   </div>
 
                   {displayLayout === 'list' ? (
-                    <div className="space-y-2">
-                      {items.map((item) => (
-                        <PantryItemRow
-                          key={item.id}
-                          item={item}
-                          bulkMode={bulkMode}
-                          isSelected={selectedItems.has(item.originalIndex)}
-                          onToggleSelect={toggleItemSelection}
-                          onSelectItem={setSelectedItemIndex}
-                          getRowActionHandlers={getRowActionHandlers}
-                          consumeGestureSuppression={consumeGestureSuppression}
-                        />
-                      ))}
-                    </div>
+                    items.length > VIRTUALIZE_THRESHOLD ? (
+                      <VirtualizedPantryItemList
+                        items={items}
+                        bulkMode={bulkMode}
+                        isSelected={(index) => selectedItems.has(index)}
+                        onToggleSelect={toggleItemSelection}
+                        onSelectItem={setSelectedItemIndex}
+                        getRowActionHandlers={getRowActionHandlers}
+                        consumeGestureSuppression={consumeGestureSuppression}
+                      />
+                    ) : (
+                      <div className="space-y-2">
+                        {items.map((item) => (
+                          <PantryItemRow
+                            key={item.id}
+                            item={item}
+                            bulkMode={bulkMode}
+                            isSelected={selectedItems.has(item.originalIndex)}
+                            onToggleSelect={toggleItemSelection}
+                            onSelectItem={setSelectedItemIndex}
+                            getRowActionHandlers={getRowActionHandlers}
+                            consumeGestureSuppression={consumeGestureSuppression}
+                          />
+                        ))}
+                      </div>
+                    )
                   ) : (
                     <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
                       {items.map((item) => (
@@ -748,20 +761,32 @@ const PantryScannerComponent: React.FC = () => {
                   </div>
 
                   {displayLayout === 'list' ? (
-                    <div className="space-y-2">
-                      {items.map((item) => (
-                        <PantryItemRow
-                          key={item.id}
-                          item={item}
-                          bulkMode={bulkMode}
-                          isSelected={selectedItems.has(item.originalIndex)}
-                          onToggleSelect={toggleItemSelection}
-                          onSelectItem={setSelectedItemIndex}
-                          getRowActionHandlers={getRowActionHandlers}
-                          consumeGestureSuppression={consumeGestureSuppression}
-                        />
-                      ))}
-                    </div>
+                    items.length > VIRTUALIZE_THRESHOLD ? (
+                      <VirtualizedPantryItemList
+                        items={items}
+                        bulkMode={bulkMode}
+                        isSelected={(index) => selectedItems.has(index)}
+                        onToggleSelect={toggleItemSelection}
+                        onSelectItem={setSelectedItemIndex}
+                        getRowActionHandlers={getRowActionHandlers}
+                        consumeGestureSuppression={consumeGestureSuppression}
+                      />
+                    ) : (
+                      <div className="space-y-2">
+                        {items.map((item) => (
+                          <PantryItemRow
+                            key={item.id}
+                            item={item}
+                            bulkMode={bulkMode}
+                            isSelected={selectedItems.has(item.originalIndex)}
+                            onToggleSelect={toggleItemSelection}
+                            onSelectItem={setSelectedItemIndex}
+                            getRowActionHandlers={getRowActionHandlers}
+                            consumeGestureSuppression={consumeGestureSuppression}
+                          />
+                        ))}
+                      </div>
+                    )
                   ) : (
                     <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
                       {items.map((item) => (

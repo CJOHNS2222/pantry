@@ -4,11 +4,11 @@ import { VersionUpdate } from '../ui/VersionUpdate';
 import { ChangelogPage } from './ChangelogPage';
 import { useIntl } from 'react-intl';
 
-interface SettingsAppUpdatesSectionProps {
+interface SettingsUpdatePageProps {
   title: string;
 }
 
-export const SettingsAppUpdatesSection: React.FC<SettingsAppUpdatesSectionProps> = ({ title }) => {
+export const SettingsUpdatePage: React.FC<SettingsUpdatePageProps> = ({ title }) => {
   const intl = useIntl();
   const [showChangelog, setShowChangelog] = useState(false);
 

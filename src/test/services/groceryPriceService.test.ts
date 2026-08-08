@@ -84,30 +84,13 @@ describe('GroceryPriceService', () => {
   });
 
   describe('getIngredientPrice', () => {
-    it('returns cached price data when available', async () => {
-      // Mock DatabaseMonitoringService.getDocs to return cached price data
-      const mockPrices = [
-        { id: 'price1', data: () => ({ price: 2.99, ingredient: 'chicken breast', lastUpdated: new Date() }) },
-        { id: 'price2', data: () => ({ price: 2.49, ingredient: 'chicken breast', lastUpdated: new Date() }) },
-        { id: 'price3', data: () => ({ price: 3.49, ingredient: 'chicken breast', lastUpdated: new Date() }) },
-      ];
-
-      const mockQuerySnapshot = {
-        docs: mockPrices,
-        forEach: vi.fn((callback) => {
-          mockPrices.forEach(callback);
-        }),
-        size: mockPrices.length,
-        empty: false
-      };
-
-      vi.mocked(DatabaseMonitoringService.getDocs).mockResolvedValueOnce(mockQuerySnapshot);
-
+    it('returns Open Prices API data when available (Firestore user-submitted lookup is disabled until there is a customer base)', async () => {
       const result = await service.getIngredientPrice('chicken breast');
 
       expect(result).toBeTruthy();
-      expect(result?.averagePrice).toBe(2.99); // (2.99 + 2.49 + 3.49) / 3 = 2.99
-      expect(result?.sampleSize).toBe(3);
+      // From the default mockFetch response: (2.99 + 3.49) / 2 = 3.24
+      expect(result?.averagePrice).toBe(3.24);
+      expect(result?.sampleSize).toBe(2);
     });
 
     it('fetches from Open Prices API when no cached data', async () => {
@@ -178,68 +161,38 @@ describe('GroceryPriceService', () => {
   });
 
   describe('getPriceTrends', () => {
-    it('retrieves price trends from Firestore', async () => {
-      const mockPrices: GroceryPrice[] = [
-        {
-          id: 'price1',
-          ingredient: 'chicken breast',
-          price: 2.99,
-          unit: 'lb',
-          store: 'Store A',
-          currency: 'USD',
-          lastUpdated: new Date(),
-          source: 'crowdsourced',
-        },
-      ];
-
-      const mockQuerySnapshot = {
-        docs: mockPrices.map(price => ({
-          id: price.id,
-          data: () => price,
-        })),
-        forEach: vi.fn((callback) => {
-          mockPrices.forEach(price => callback({
-            id: price.id,
-            data: () => price,
-          }));
-        }),
-        size: mockPrices.length,
-        empty: false
-      };
-
-      vi.mocked(DatabaseMonitoringService.getDocs).mockResolvedValueOnce(mockQuerySnapshot);
-
-      // Mock API to return empty so we only get Firestore data
+    it('retrieves price trends from the Open Prices API (Firestore historical lookup is disabled until there is a customer base)', async () => {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const fetchOpenPricesHistorySpy = vi.spyOn(service as any, 'fetchOpenPricesHistory').mockResolvedValueOnce([]);
+      const fetchOpenPricesHistorySpy = vi.spyOn(service as any, 'fetchOpenPricesHistory').mockResolvedValueOnce([
+        {
+          id: '1',
+          product_id: 'chicken',
+          price: 2.99,
+          currency: 'USD',
+          store: 'Store A',
+          date: '2024-01-01',
+        },
+      ]);
 
       const result = await service.getPriceTrends('chicken breast', 30);
 
+      expect(fetchOpenPricesHistorySpy).toHaveBeenCalled();
       expect(result).toHaveLength(1);
       expect(result[0].price).toBe(2.99);
     });
 
     it('returns empty array when no trends found', async () => {
-      const mockEmptyQuerySnapshot = {
-        docs: [],
-        forEach: vi.fn(),
-        size: 0,
-        empty: true
-      };
-
-      vi.mocked(DatabaseMonitoringService.getDocs).mockResolvedValueOnce(mockEmptyQuerySnapshot);
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      vi.spyOn(service as any, 'fetchOpenPricesHistory').mockResolvedValueOnce([]);
 
       const result = await service.getPriceTrends('unknown ingredient', 30);
 
       expect(result).toEqual([]);
     });
 
-    it('handles query errors', async () => {
-      vi.mocked(DatabaseMonitoringService.getDocs).mockRejectedValueOnce(new Error('Query failed'));
-
-      // Mock API fallback to return empty
+    it('returns empty array when the API fetch fails', async () => {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const fetchOpenPricesHistorySpy = vi.spyOn(service as any, 'fetchOpenPricesHistory').mockResolvedValueOnce([]);
+      vi.spyOn(service as any, 'fetchOpenPricesHistory').mockRejectedValueOnce(new Error('API failed'));
 
       const result = await service.getPriceTrends('chicken breast', 30);
 

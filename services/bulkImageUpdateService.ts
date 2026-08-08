@@ -2,7 +2,7 @@ import DatabaseMonitoringService from './databaseMonitoringService';
 import { InventoryCacheService } from './inventoryCacheService';
 import { User } from '../types';
 import { fetchExternalItemImage } from '../utils/appUtils';
-import { getCachedImageUrls, cacheImagesFromUrls, initializeImageCache } from './imageCacheService';
+import { cacheImagesFromUrls, initializeImageCache } from './imageCacheService';
 import { log } from './logService';
 
 export interface BulkImageUpdateResult {
@@ -45,14 +45,11 @@ export class BulkImageUpdateService {
         return result;
       }
 
-      // Check cache for all items in one batch operation (much more efficient!)
-      const itemNames = itemsNeedingImages.map(item => item.item);
-      const cachedImages = await getCachedImageUrls(itemNames);
-
-      // Found items already cached
-
-      // Separate cached vs uncached items
-      const uncachedItems = itemsNeedingImages.filter(item => !cachedImages.has(item.item));
+      // Firestore cache lookup disabled for now - treat every item as uncached and
+      // fetch fresh from Open Food Facts/Unsplash. cacheImagesFromUrls() below still
+      // writes results to Firestore/Storage.
+      const cachedImages = new Map<string, string>();
+      const uncachedItems = itemsNeedingImages;
 
       // Fetch images for uncached items
       // Fetching images for uncached items
@@ -169,14 +166,11 @@ export class BulkImageUpdateService {
         return result;
       }
 
-      // Check cache for all items in one batch operation
-      const itemNames = itemsNeedingImages.map(item => item.item);
-      const cachedImages = await getCachedImageUrls(itemNames);
-
-      // Found household items already cached
-
-      // Separate cached vs uncached items
-      const uncachedItems = itemsNeedingImages.filter(item => !cachedImages.has(item.item));
+      // Firestore cache lookup disabled for now - treat every item as uncached and
+      // fetch fresh from Open Food Facts/Unsplash. cacheImagesFromUrls() below still
+      // writes results to Firestore/Storage.
+      const cachedImages = new Map<string, string>();
+      const uncachedItems = itemsNeedingImages;
 
       // Fetch images for uncached items
       // Fetching images for uncached household items

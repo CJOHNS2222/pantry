@@ -2,13 +2,13 @@ import React from 'react';
 import { BarChart2 } from 'lucide-react';
 import { LeftoverAnalytics } from '../leftovers/LeftoverAnalytics';
 
-interface SettingsLeftoverAnalyticsSectionProps {
+interface SettingsFoodWastePageProps {
   userId?: string;
   householdId?: string;
   title: string;
 }
 
-export const SettingsLeftoverAnalyticsSection: React.FC<SettingsLeftoverAnalyticsSectionProps> = ({
+export const SettingsFoodWastePage: React.FC<SettingsFoodWastePageProps> = ({
   userId, householdId, title, }) => {
   if (!userId) {
     return null;

@@ -4,7 +4,9 @@ import { User } from '../types';
 import { NotificationService, AppNotification, NotificationSettings } from '../services/notificationBuilderService';
 import { log } from '../services/logService';
 
-const POLL_INTERVAL_MS = 5 * 60 * 1000;
+// Notifications are built from expiry data that changes at most once a day, so
+// polling every 5 minutes was far more frequent than the underlying data warrants.
+const POLL_INTERVAL_MS = 24 * 60 * 60 * 1000;
 
 function getPriorityWeight(priority: string): number {
   switch (priority) {

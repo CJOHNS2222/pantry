@@ -50,6 +50,8 @@
     "yes": "Yes",
     "no": "No",
     "ok": "OK",
+    "confirm": "Confirm",
+    "done": "Done",
     "submit": "Submit",
     "reset": "Reset",
     "clear": "Clear",
@@ -108,6 +110,33 @@
     "buyMore": "Buy More",
     "priceTrends": "Price Trends",
     "deleteItem": "Delete Item",
+    "selectedCount": "{count} item{count, plural, =1 {} other {s}} selected",
+    "selectAll": "Select All",
+    "deselectAll": "Deselect All",
+    "editQty": "Edit Qty",
+    "storage": "Storage",
+    "recentlyAdded": "Recently Added",
+    "nameAz": "Name (A-Z)",
+    "searching": "Searching: \"{query}\"",
+    "bulkMode": "Bulk select mode",
+    "switchToGrid": "Switch to grid view",
+    "switchToList": "Switch to list view",
+    "filterOptions": "Filter options",
+    "amountLeft": "Select Amount Left",
+    "visualLevels": {
+      "empty": "Empty",
+      "quarter": "¼",
+      "half": "½",
+      "threeQuarter": "¾",
+      "full": "Full"
+    },
+    "addToShoppingList": "ADD TO SHOPPING LIST",
+    "smartAiScanner": "Smart AI Scanner",
+    "smartAiScannerDesc": "Snap a photo of your shelves or receipt.",
+    "quickAddStaples": "Quick Add Staples",
+    "quickAddStaplesDesc": "Type items or select popular staples.",
+    "importCsvUrl": "Import CSV or URL",
+    "importCsvUrlDesc": "Upload a spreadsheet or scrape ingredients.",
     "storageLocations": {
       "pantry": "Pantry",
       "fridge": "Fridge",
@@ -138,7 +167,14 @@
     "smsUnavailable": "Unable to open SMS app. Shopping list has been copied to clipboard.",
     "addedBatches": "Added Batches:",
     "unknownDate": "Unknown date",
-    "via": "via {source}"
+    "via": "via {source}",
+    "costEstimator": "Grocery Cost Estimator",
+    "estimatedTotal": "Estimated Total",
+    "unpricedItems": "{count} unpriced item{count, plural, =1 {} other {s}}",
+    "markPurchased": "Mark Purchased",
+    "markAllPurchased": "Mark All Purchased",
+    "clearPurchased": "Clear Purchased",
+    "clearAll": "Clear All List Items"
   },
   "recipes": {
     "originalSource": "View original recipe",
@@ -161,7 +197,16 @@
     "saveRecipe": "Save Recipe",
     "addToPlan": "Add to Plan",
     "markAsMade": "Mark as Made",
-    "importRecipe": "Import Recipe"
+    "importRecipe": "Import Recipe",
+    "rateRecipe": "Rate Recipe",
+    "dietary": {
+      "vegetarian": "Vegetarian",
+      "vegan": "Vegan",
+      "glutenFree": "Gluten-Free",
+      "lowCarb": "Low Carb",
+      "dairyFree": "Dairy-Free",
+      "keto": "Keto"
+    }
   },
   "mealPlanner": {
     "title": "Meal Planner",
@@ -213,6 +258,11 @@
     "foodSafety": "Food Safety",
     "leftoverAnalytics": "Leftover Analytics",
     "pendingNotifications": "Notification History",
+    "privacyNotice": "We use the device camera to scan barcodes and take pantry item photos. Review our privacy policy and terms of service for details about data collection and storage.",
+    "viewPrivacyPolicy": "View Privacy Policy",
+    "termsOfService": "Terms of Service",
+    "copyUrl": "Copy URL",
+    "deleteAccount": "Delete Account",
     "pantryImages": "Pantry Images",
     "storeLayout": "Store Layout",
     "themeSettings": "Theme Settings",
@@ -284,6 +334,14 @@
     "removeMember": "Remove Member",
     "leaveHousehold": "Leave Household",
     "householdName": "Household Name"
+  },
+  "community": {
+    "title": "Community",
+    "activityFeed": "Activity Feed",
+    "recipeSharing": "Recipe Sharing",
+    "challenges": "Challenges",
+    "shareRecipe": "Share Recipe",
+    "comment": "Comment"
   },
   "errors": {
     "networkError": "Network error. Please check your connection.",

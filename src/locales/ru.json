@@ -47,6 +47,8 @@
     "yes": "Да",
     "no": "Нет",
     "ok": "ОК",
+    "confirm": "Подтвердить",
+    "done": "Готово",
     "submit": "Отправить",
     "reset": "Сброс",
     "clear": "Очистить",
@@ -105,6 +107,33 @@
     "buyMore": "Купить ещё",
     "priceTrends": "Динамика цен",
     "deleteItem": "Удалить продукт",
+    "selectedCount": "{count} элементов выбрано",
+    "selectAll": "Выбрать все",
+    "deselectAll": "Снять выбор",
+    "editQty": "Изм. кол-во",
+    "storage": "Хранение",
+    "recentlyAdded": "Недавно добавленные",
+    "nameAz": "По названию (А-Я)",
+    "searching": "Поиск: \"{query}\"",
+    "bulkMode": "Режим массового выбора",
+    "switchToGrid": "Переключить на сетку",
+    "switchToList": "Переключить на список",
+    "filterOptions": "Параметры фильтра",
+    "amountLeft": "Выберите остаток",
+    "visualLevels": {
+      "empty": "Пусто",
+      "quarter": "¼",
+      "half": "½",
+      "threeQuarter": "¾",
+      "full": "Полный"
+    },
+    "addToShoppingList": "ДОБАВИТЬ В СПИСОК ПОКУПОК",
+    "smartAiScanner": "Умный ИИ-сканер",
+    "smartAiScannerDesc": "Сделайте фото полок или чека.",
+    "quickAddStaples": "Быстрое добавление основных продуктов",
+    "quickAddStaplesDesc": "Введите наименования или выберите популярные продукты.",
+    "importCsvUrl": "Импорт CSV или URL",
+    "importCsvUrlDesc": "Загрузите таблицу или распознайте ингредиенты с веб-страницы.",
     "storageLocations": {
       "pantry": "Кладовая",
       "fridge": "Холодильник",
@@ -135,7 +164,14 @@
     "smsUnavailable": "Не удалось открыть SMS-приложение. Список скопирован в буфер обмена.",
     "addedBatches": "Добавленные партии:",
     "unknownDate": "Неизвестная дата",
-    "via": "через {source}"
+    "via": "через {source}",
+    "costEstimator": "Оценка стоимости покупок",
+    "estimatedTotal": "Ориентировочная сумма",
+    "unpricedItems": "{count} товаров без цены",
+    "markPurchased": "Отметить как купленное",
+    "markAllPurchased": "Отметить всё как купленное",
+    "clearPurchased": "Удалить купленное",
+    "clearAll": "Очистить весь список"
   },
   "recipes": {
     "originalSource": "Посмотреть оригинальный рецепт",
@@ -158,7 +194,16 @@
     "saveRecipe": "Сохранить рецепт",
     "addToPlan": "Добавить в план",
     "markAsMade": "Отметить как приготовленное",
-    "importRecipe": "Импортировать рецепт"
+    "importRecipe": "Импортировать рецепт",
+    "rateRecipe": "Оценить рецепт",
+    "dietary": {
+      "vegetarian": "Вегетарианское",
+      "vegan": "Веганское",
+      "glutenFree": "Без глютена",
+      "lowCarb": "Низкоуглеводное",
+      "dairyFree": "Без молока",
+      "keto": "Кето"
+    }
   },
   "mealPlanner": {
     "title": "Планировщик питания",
@@ -206,8 +251,13 @@
     "categories": "Категории",
     "feedback": "Обратная связь",
     "foodSafety": "Безопасность пищевых продуктов",
-    "leftoverAnalytics": "Анализ остатков",
-    "pendingNotifications": "Ожидающие уведомления",
+    "leftoverAnalytics": "Аналитика остатков",
+    "pendingNotifications": "История уведомлений",
+    "privacyNotice": "Мы используем камеру устройства для сканирования штрихкодов и фотосъемки продуктов. Ознакомьтесь с политикой конфиденциальности и условиями использования.",
+    "viewPrivacyPolicy": "Политика конфиденциальности",
+    "termsOfService": "Условия использования",
+    "copyUrl": "Скопировать URL",
+    "deleteAccount": "Удалить аккаунт",
     "pantryImages": "Изображения кладовой",
     "storeLayout": "Планировка магазина",
     "themeSettings": "Настройки темы",
@@ -279,6 +329,14 @@
     "removeMember": "Удалить участника",
     "leaveHousehold": "Покинуть домохозяйство",
     "householdName": "Название домохозяйства"
+  },
+  "community": {
+    "title": "Сообщество",
+    "activityFeed": "Лента активности",
+    "recipeSharing": "Обмен рецептами",
+    "challenges": "Челленджи",
+    "shareRecipe": "Поделиться рецептом",
+    "comment": "Комментировать"
   },
   "errors": {
     "networkError": "Ошибка сети. Пожалуйста, проверьте подключение.",

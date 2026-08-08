@@ -232,16 +232,15 @@ export function useDataManagement(
 
             // Undo history is local (IndexedDB), so per-item recording here doesn't
             // add Firestore cost - each item still needs its own restorable entry.
-            for (const itemToDelete of deletedItems) {
-              await inventory.recordUndo('delete_item', itemToDelete);
-            }
-            for (const updated of updatedItems) {
-              await inventory.recordUndo('update_item', {
+            // Writes are independent, so batch them instead of serializing IDB round-trips.
+            await Promise.all([
+              ...deletedItems.map(itemToDelete => inventory.recordUndo('delete_item', itemToDelete)),
+              ...updatedItems.map(updated => inventory.recordUndo('update_item', {
                 itemId: updated.item.id,
                 previousState: updated.item,
                 updates: updated.updates
-              });
-            }
+              }))
+            ]);
 
             // Batch side effects for deleted items
             if (deletedItems.length > 0) {

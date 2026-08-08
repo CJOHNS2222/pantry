@@ -413,11 +413,7 @@ export async function getCachedImageUrls(itemNames: string[]): Promise<Map<strin
 export async function cacheImageFromUrl(originalUrl: string, itemName: string): Promise<string | null> {
   const cacheKey = itemName.toLowerCase().trim();
 
-  // Check if already cached (without hitting Firestore if possible)
-  const existingCache = await getCachedImageUrl(itemName);
-  if (existingCache) {
-    return existingCache;
-  }
+  // Firestore dedup lookup disabled for now - always re-fetch/upload. Writes below still cache to Firestore/Storage.
 
   // Download the image
   const imageBlob = await downloadImageAsBlob(originalUrl);
@@ -492,22 +488,15 @@ export async function cacheImagesFromUrls(imageMap: Map<string, string>): Promis
   const results = new Map<string, string>();
   const toCache: Array<{ itemName: string; originalUrl: string; cacheKey: string }> = [];
 
-  // Check what's already cached first
-  const itemNames = Array.from(imageMap.keys());
-  const existingCache = await getCachedImageUrls(itemNames);
-
-  // Filter out already cached items
+  // Firestore dedup lookup disabled for now - cache every item fresh. Writes below still
+  // cache results to Firestore/Storage.
   imageMap.forEach((originalUrl, itemName) => {
     const cacheKey = itemName.toLowerCase().trim();
-    if (!existingCache.has(itemName)) {
-      toCache.push({ itemName, originalUrl, cacheKey });
-    } else {
-      results.set(itemName, existingCache.get(itemName)!);
-    }
+    toCache.push({ itemName, originalUrl, cacheKey });
   });
 
   if (toCache.length === 0) {
-    return results; // All already cached
+    return results; // Nothing to cache
   }
 
   // Caching new images

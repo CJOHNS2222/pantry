@@ -490,35 +490,39 @@ export class RecipeRatingService {
     limitCount: number = 5
   ): Promise<RecipeRecommendation[]> {
     try {
-      // Get user's rating history
+      // User ratings, household ratings, and the recipe cache are independent reads -
+      // fetch them in parallel instead of serializing 2-3 round-trips.
       const userRatingsQuery = DatabaseMonitoringService.query(
         DatabaseMonitoringService.collection(this.RATINGS_COLLECTION),
         DatabaseMonitoringService.where('userId', '==', userId),
         DatabaseMonitoringService.orderBy('date', 'desc'),
         DatabaseMonitoringService.limit(20)
       );
-      const userRatings = await DatabaseMonitoringService.getDocs(userRatingsQuery);
-      const userRatingData = userRatings.docs.map((doc: QueryDocumentSnapshot<DocumentData>) => doc.data() as RecipeRating);
+      const householdQuery = householdId
+        ? DatabaseMonitoringService.query(
+            DatabaseMonitoringService.collection(this.RATINGS_COLLECTION),
+            DatabaseMonitoringService.where('householdId', '==', householdId),
+            DatabaseMonitoringService.orderBy('date', 'desc'),
+            DatabaseMonitoringService.limit(50)
+          )
+        : null;
 
-      // Get household preferences
-      let householdRatings: RecipeRating[] = [];
-      if (householdId) {
-        const householdQuery = DatabaseMonitoringService.query(
-          DatabaseMonitoringService.collection(this.RATINGS_COLLECTION),
-          DatabaseMonitoringService.where('householdId', '==', householdId),
-          DatabaseMonitoringService.orderBy('date', 'desc'),
-          DatabaseMonitoringService.limit(50)
-        );
-        const householdSnapshot = await DatabaseMonitoringService.getDocs(householdQuery);
-        householdRatings = householdSnapshot.docs.map((doc: QueryDocumentSnapshot<DocumentData>) => doc.data() as RecipeRating);
-      }
+      const [userRatings, householdSnapshot, allCachedRecipes] = await Promise.all([
+        DatabaseMonitoringService.getDocs(userRatingsQuery),
+        householdQuery ? DatabaseMonitoringService.getDocs(householdQuery) : Promise.resolve(null),
+        getAllCachedRecipes()
+      ]);
+
+      const userRatingData = userRatings.docs.map((doc: QueryDocumentSnapshot<DocumentData>) => doc.data() as RecipeRating);
+      const householdRatings: RecipeRating[] = householdSnapshot
+        ? householdSnapshot.docs.map((doc: QueryDocumentSnapshot<DocumentData>) => doc.data() as RecipeRating)
+        : [];
 
       // Simple recommendation logic (can be enhanced with ML)
       const recommendations: RecipeRecommendation[] = [];
 
       // Load full recipe objects from the merged recipe caches for title lookup and
       // ingredient matching (never query 'recipes' directly).
-      const allCachedRecipes = await getAllCachedRecipes();
       const recipeByTitle = new Map(allCachedRecipes.map(r => [r.title.toLowerCase(), r]));
 
       // Household-loved recipes that user hasn't rated

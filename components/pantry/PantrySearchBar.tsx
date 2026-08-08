@@ -1,5 +1,6 @@
 import React from 'react';
 import { Search, Filter, LayoutGrid, LayoutList, X } from 'lucide-react';
+import { useIntl } from 'react-intl';
 import { PantryFilter } from '../../types';
 
 interface PantrySearchBarProps {
@@ -31,6 +32,7 @@ export const PantrySearchBar: React.FC<PantrySearchBarProps> = ({
   pantryFilter,
   onOpenSearchModal,
 }) => {
+  const intl = useIntl();
   const activeFilterCount =
     (pantryFilter.categories.length > 0 ? 1 : 0) +
     (pantryFilter.locations.length > 0 ? 1 : 0) +
@@ -49,7 +51,9 @@ export const PantrySearchBar: React.FC<PantrySearchBarProps> = ({
         >
           <Search className="w-4 h-4 text-theme-secondary shrink-0" />
           <span className="truncate">
-            {searchQuery ? `Searching: "${searchQuery}"` : 'Search pantry items...'}
+            {searchQuery
+              ? intl.formatMessage({ id: 'pantry.searching', defaultMessage: 'Searching: "{query}"' }, { query: searchQuery })
+              : intl.formatMessage({ id: 'pantry.searchItems', defaultMessage: 'Search pantry items...' })}
           </span>
         </button>
 
@@ -61,7 +65,7 @@ export const PantrySearchBar: React.FC<PantrySearchBarProps> = ({
               ? 'bg-[var(--accent-color)] text-[var(--accent-text,white)] border-[var(--accent-color)] shadow'
               : 'bg-theme-secondary border-theme text-theme-secondary hover:text-theme-primary'
           }`}
-          aria-label="Filter options"
+          aria-label={intl.formatMessage({ id: 'pantry.filterOptions', defaultMessage: 'Filter options' })}
         >
           <Filter className="w-4 h-4" />
           {isFilterActive && (
@@ -75,7 +79,9 @@ export const PantrySearchBar: React.FC<PantrySearchBarProps> = ({
         <button
           onClick={toggleDisplayLayout}
           className="p-2 rounded-xl bg-theme-secondary border border-theme text-theme-secondary hover:text-theme-primary transition-colors shrink-0"
-          aria-label={displayLayout === 'list' ? 'Switch to grid view' : 'Switch to list view'}
+          aria-label={displayLayout === 'list'
+            ? intl.formatMessage({ id: 'pantry.switchToGrid', defaultMessage: 'Switch to grid view' })
+            : intl.formatMessage({ id: 'pantry.switchToList', defaultMessage: 'Switch to list view' })}
         >
           {displayLayout === 'list' ? <LayoutGrid className="w-4 h-4" /> : <LayoutList className="w-4 h-4" />}
         </button>
@@ -93,7 +99,7 @@ export const PantrySearchBar: React.FC<PantrySearchBarProps> = ({
                 : 'text-theme-secondary hover:text-theme-primary'
             }`}
           >
-            Storage
+            {intl.formatMessage({ id: 'pantry.storage', defaultMessage: 'Storage' })}
           </button>
           <button
             onClick={() => setViewMode('category')}
@@ -103,23 +109,23 @@ export const PantrySearchBar: React.FC<PantrySearchBarProps> = ({
                 : 'text-theme-secondary hover:text-theme-primary'
             }`}
           >
-            Category
+            {intl.formatMessage({ id: 'pantry.category', defaultMessage: 'Category' })}
           </button>
         </div>
 
         {/* Sort selector */}
         <div className="flex items-center gap-1.5 text-xs text-theme-secondary">
-          <span className="opacity-70">Sort:</span>
+          <span className="opacity-70">{intl.formatMessage({ id: 'common.sort', defaultMessage: 'Sort' })}:</span>
           <select
             value={sortBy}
             onChange={(e) => setSortBy(e.target.value as 'name' | 'lastAdded' | 'expiration' | 'category' | 'location')}
             className="bg-transparent font-semibold text-theme-primary focus:outline-none cursor-pointer dark:text-slate-100"
           >
-            <option value="location" className="bg-theme-primary text-theme-primary">Storage Location</option>
-            <option value="name" className="bg-theme-primary text-theme-primary">Name (A-Z)</option>
-            <option value="expiration" className="bg-theme-primary text-theme-primary">Expiration Date</option>
-            <option value="lastAdded" className="bg-theme-primary text-theme-primary">Recently Added</option>
-            <option value="category" className="bg-theme-primary text-theme-primary">Category</option>
+            <option value="location" className="bg-theme-primary text-theme-primary">{intl.formatMessage({ id: 'pantry.storageLocation', defaultMessage: 'Storage Location' })}</option>
+            <option value="name" className="bg-theme-primary text-theme-primary">{intl.formatMessage({ id: 'pantry.nameAz', defaultMessage: 'Name (A-Z)' })}</option>
+            <option value="expiration" className="bg-theme-primary text-theme-primary">{intl.formatMessage({ id: 'pantry.expirationDate', defaultMessage: 'Expiration Date' })}</option>
+            <option value="lastAdded" className="bg-theme-primary text-theme-primary">{intl.formatMessage({ id: 'pantry.recentlyAdded', defaultMessage: 'Recently Added' })}</option>
+            <option value="category" className="bg-theme-primary text-theme-primary">{intl.formatMessage({ id: 'pantry.category', defaultMessage: 'Category' })}</option>
           </select>
         </div>
       </div>

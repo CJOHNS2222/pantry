@@ -489,14 +489,16 @@ const ItemDetailModal: React.FC<ItemDetailModalProps> = ({
 
             {/* Fill Level - Portion Selector */}
             <div className="mt-4">
-              <div className="text-xs font-medium text-theme-secondary mb-2">Select Amount Left</div>
+              <div className="text-xs font-medium text-theme-secondary mb-2">
+                {intl.formatMessage({ id: 'pantry.amountLeft', defaultMessage: 'Select Amount Left' })}
+              </div>
               <div className="flex gap-1.5">
                 {([
-                  { value: 'empty',        label: 'Empty', icon: '○', color: '#ef4444' },
+                  { value: 'empty',        label: intl.formatMessage({ id: 'pantry.visualLevels.empty', defaultMessage: 'Empty' }), icon: '○', color: '#ef4444' },
                   { value: 'quarter',      label: '¼',  icon: '◔', color: '#f59e0b' },
                   { value: 'half',         label: '½',  icon: '◑', color: '#f97316' },
                   { value: 'threeQuarter', label: '¾',  icon: '◕', color: '#22c55e' },
-                  { value: 'full',         label: 'Full', icon: '●', color: '#16a34a' },
+                  { value: 'full',         label: intl.formatMessage({ id: 'pantry.visualLevels.full', defaultMessage: 'Full' }), icon: '●', color: '#16a34a' },
                 ] as { value: NonNullable<PantryItem['visualLevel']>; label: string; icon: string; color: string }[]).map(({ value, label, icon, color }) => {
                   const selected = localVisualLevel === value;
                   return (
@@ -535,7 +537,7 @@ const ItemDetailModal: React.FC<ItemDetailModalProps> = ({
                 className="px-3 py-1.5 text-sm font-medium border border-[var(--accent-color)] text-[var(--accent-color)] rounded-lg hover:bg-[var(--accent-color)]/10 transition-colors"
                 data-testid="item-add-to-shopping"
               >
-                ADD TO SHOPPING LIST
+                {intl.formatMessage({ id: 'pantry.addToShoppingList', defaultMessage: 'ADD TO SHOPPING LIST' })}
               </button>
               <button
                 onClick={() => {

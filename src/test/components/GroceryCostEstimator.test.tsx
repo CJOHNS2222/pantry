@@ -9,7 +9,7 @@ vi.mock('../../../services/groceryPriceService', () => ({
   groceryPriceService: {
     getIngredientPrice: vi.fn(),
     submitPriceUpdate: vi.fn(),
-    getDefaultPrice: vi.fn().mockReturnValue({ price: 2.99, unit: 'unit' }),
+    getDefaultPrice: vi.fn().mockResolvedValue({ price: 2.99, unit: 'unit' }),
   },
 }));
 
@@ -161,7 +161,7 @@ describe('GroceryCostEstimator', () => {
 
   it('calculates total cost using averagePrice * quantity, matching the shopping list formula', async () => {
     vi.mocked(groceryPriceService.getIngredientPrice).mockResolvedValue(null);
-    vi.mocked(groceryPriceService.getDefaultPrice).mockImplementation((name: string) => {
+    vi.mocked(groceryPriceService.getDefaultPrice).mockImplementation(async (name: string) => {
       if (/banana/i.test(name)) return { price: 0.79, unit: 'lb' };
       if (/chicken/i.test(name)) return { price: 3.99, unit: 'lb' };
       return { price: 2.99, unit: 'unit' };

@@ -23,12 +23,8 @@ export async function fetchRecipeImage(recipeTitle: string): Promise<string | nu
 }
 export async function fetchGroceryItemImage(itemName: string): Promise<string | null> {
   try {
-    // Check cache first
-    const { getCachedImageUrl } = await import('./imageCacheService');
-    const cachedUrl = await getCachedImageUrl(itemName);
-    if (cachedUrl) {
-      return cachedUrl;
-    }
+    // Firestore cache lookup disabled for now (search goes straight to Open Food Facts).
+    // cacheImageFromUrl() below still writes results to Firestore/Storage.
 
     // Clean the item name for better search results
     const cleanName = itemName.toLowerCase()

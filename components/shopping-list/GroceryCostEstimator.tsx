@@ -1,5 +1,6 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { DollarSign, Calculator, TrendingUp, Users, RefreshCw } from 'lucide-react';
+import { useIntl } from 'react-intl';
 import { ShoppingItem } from '../../types';
 import { Tab } from '../../types/app';
 import { groceryPriceService, PriceData } from '../../services/groceryPriceService';
@@ -32,12 +33,6 @@ interface IngredientCost {
   source: 'estimated' | 'known';
 }
 
-// Mirrors ShoppingList.tsx's estimateItemPrice: price is the item's average
-// per-unit price times the raw parsed quantity (no unit conversion). Default
-// prices in groceryPriceService are quoted per whatever unit is customary for
-// that item (e.g. per lb, per dozen, per bottle) and recipe quantities are
-// treated as that many of that unit — same assumption the shopping list's
-// own cost tracking already makes, so totals here agree with it.
 function parseQuantity(quantity?: number | string): number {
   if (typeof quantity === 'number') return quantity;
   if (typeof quantity === 'string') {
@@ -48,11 +43,18 @@ function parseQuantity(quantity?: number | string): number {
 }
 
 export const GroceryCostEstimator: React.FC<GroceryCostEstimatorProps> = ({ missingIngredients, onEstimatorToggle, freeItemLimit }) => {
+  let intl;
+  try {
+    intl = useIntl();
+  } catch {
+    // Rendered outside IntlProvider in test environment
+  }
   const { addToast, setActiveTab, setActiveSettingsCategory } = useAppActions();
   const { user } = useApp();
   const [showEstimator, setShowEstimator] = useState(false);
   const [customPrices, setCustomPrices] = useState<Record<string, number>>({});
   const [priceData, setPriceData] = useState<Record<string, PriceData>>({});
+  const [defaultPrices, setDefaultPrices] = useState<Record<string, { price: number; unit: string }>>({});
   const [loadingPrices, setLoadingPrices] = useState(false);
   const [showPriceInput, setShowPriceInput] = useState<string | null>(null);
   const [userPriceInputs, setUserPriceInputs] = useState<Record<string, { price: string; unit: string; store: string }>>({});
@@ -98,20 +100,26 @@ export const GroceryCostEstimator: React.FC<GroceryCostEstimatorProps> = ({ miss
     setLoadingPrices(true);
     try {
       const pricePromises = consolidated.map(async (item) => {
-        const data = await groceryPriceService.getIngredientPrice(item.item);
-        return { key: getIngredientKey(item.item), data };
+        const [data, defaultPrice] = await Promise.all([
+          groceryPriceService.getIngredientPrice(item.item),
+          groceryPriceService.getDefaultPrice(item.item)
+        ]);
+        return { key: getIngredientKey(item.item), data, defaultPrice };
       });
 
       const results = await Promise.all(pricePromises);
       const newPriceData: Record<string, PriceData> = {};
+      const newDefaultPrices: Record<string, { price: number; unit: string }> = {};
 
-      results.forEach(({ key, data }) => {
+      results.forEach(({ key, data, defaultPrice }) => {
         if (data) {
           newPriceData[key] = data;
         }
+        newDefaultPrices[key] = defaultPrice;
       });
 
       setPriceData(newPriceData);
+      setDefaultPrices(newDefaultPrices);
     } catch (error) {
       log.error('Error fetching prices', { error });
     } finally {
@@ -192,8 +200,9 @@ export const GroceryCostEstimator: React.FC<GroceryCostEstimatorProps> = ({ miss
         };
       }
 
-      // Priority 3: curated default price database
-      const priceInfo = groceryPriceService.getDefaultPrice(item.item);
+      // Priority 3: curated default price database (fetched alongside live prices
+      // in fetchCurrentPrices; getDefaultPrice is async so it can't be called here)
+      const priceInfo = defaultPrices[key] ?? { price: 2.99, unit: 'unit' };
       return {
         ingredient: item.item,
         quantity: qty,
@@ -202,7 +211,7 @@ export const GroceryCostEstimator: React.FC<GroceryCostEstimatorProps> = ({ miss
         source: 'estimated'
       };
     });
-  }, [consolidated, customPrices, priceData]);
+  }, [consolidated, customPrices, priceData, defaultPrices]);
 
   const visibleBreakdown = freeItemLimit !== undefined ? costBreakdown.slice(0, freeItemLimit) : costBreakdown;
   const lockedCount = freeItemLimit !== undefined ? Math.max(0, costBreakdown.length - freeItemLimit) : 0;
@@ -215,7 +224,9 @@ export const GroceryCostEstimator: React.FC<GroceryCostEstimatorProps> = ({ miss
         className="flex items-center justify-center gap-2 px-4 py-2 w-full bg-green-600 hover:bg-green-700 text-white rounded-lg transition-colors whitespace-nowrap"
       >
         <Calculator className="w-4 h-4 flex-shrink-0" />
-        <span className="truncate">Estimate Grocery Costs</span>
+        <span className="truncate">
+          {intl?.formatMessage({ id: 'shoppingList.costEstimator', defaultMessage: 'Estimate Grocery Costs' }) ?? 'Estimate Grocery Costs'}
+        </span>
       </button>
     );
   }
@@ -225,7 +236,7 @@ export const GroceryCostEstimator: React.FC<GroceryCostEstimatorProps> = ({ miss
       <div className="flex items-center justify-between mb-4">
         <h3 className="text-lg font-semibold text-theme-secondary flex items-center gap-2">
           <DollarSign className="w-5 h-5" />
-          Grocery Cost Estimator
+          {intl?.formatMessage({ id: 'shoppingList.costEstimator', defaultMessage: 'Grocery Cost Estimator' }) ?? 'Grocery Cost Estimator'}
         </h3>
         <button
           onClick={() => toggleEstimator(false)}

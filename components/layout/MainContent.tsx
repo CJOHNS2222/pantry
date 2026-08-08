@@ -1,4 +1,5 @@
 import React, { Suspense } from 'react';
+import { FormattedMessage } from 'react-intl';
 import { Tab } from '../../types/app';
 
 // Lazy load all major components for better performance
@@ -21,7 +22,9 @@ import { useAppActions } from '../../contexts/AppActionsContext';
 const LoadingSpinner: React.FC = () => (
   <div className="flex items-center justify-center py-12">
     <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[var(--accent-color)]"></div>
-    <span className="ml-3 text-theme-secondary">Loading...</span>
+    <span className="ml-3 text-theme-secondary">
+      <FormattedMessage id="common.loading" defaultMessage="Loading..." />
+    </span>
   </div>
 );
 
