@@ -1,3 +1,12 @@
+## [3.0.24] - 2026-08-08
+
+### Added / Changed / Fixed
+- **Expanded Internationalization (i18n)** — Added full translation key coverage across 7 shipped locales (`de`, `en`, `es`, `fr`, `ja`, `ru`, `zh`) for Pantry Modals, Shopping List, Recipes, Meal Planner, Household, Community, and Settings screens.
+- **Online Order Disclaimer** — Marked online grocery ordering section with "Under Construction (Beta)" status and added experimental feature disclaimer.
+- **Vitest & Performance Stability** — Resolved component re-render loops and timer handle leaks across testing suites.
+
+---
+
 ## [3.0.23] - 2026-08-07
 
 ### Added / Changed / Fixed

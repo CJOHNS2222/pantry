@@ -202,6 +202,7 @@ function loadLocalCache(): void {
       const cacheAge = Date.now() - (cacheData.timestamp || 0);
       if (cacheAge < CACHE_EXPIRY_MS) {
         Object.entries(cacheData.cache).forEach(([key, value]) => {
+          evictLruIfNeeded();
           memoryCache.set(key, reviveCachedImage(value));
         });
       } else {
@@ -289,6 +290,7 @@ export async function getCachedImageUrl(itemName: string): Promise<string | null
       if (cached) {
         // Load into memory cache, reviving Date fields
         const revivedCache = reviveCachedImage(cached);
+        evictLruIfNeeded();
         memoryCache.set(cacheKey, revivedCache);
         return revivedCache.cachedUrl;
       }
@@ -313,6 +315,7 @@ export async function getCachedImageUrl(itemName: string): Promise<string | null
       const cachedImage = data[cacheKey];
       if (cachedImage) {
         // Store in memory and local cache
+        evictLruIfNeeded();
         memoryCache.set(cacheKey, cachedImage);
         debouncedSaveLocalCache();
         return cachedImage.cachedUrl;
@@ -357,6 +360,7 @@ export async function getCachedImageUrls(itemNames: string[]): Promise<Map<strin
         const cached = cacheData.cache[cacheKey];
         if (cached) {
           const revivedCache = reviveCachedImage(cached);
+          evictLruIfNeeded();
           memoryCache.set(cacheKey, revivedCache);
           results.set(cacheKey, revivedCache.cachedUrl);
         }
@@ -388,6 +392,7 @@ export async function getCachedImageUrls(itemNames: string[]): Promise<Map<strin
         keysInShard.forEach(cacheKey => {
           const cachedImage = data[cacheKey];
           if (cachedImage) {
+            evictLruIfNeeded();
             memoryCache.set(cacheKey, cachedImage);
             results.set(cacheKey, cachedImage.cachedUrl);
           } else {
@@ -574,6 +579,7 @@ export async function cacheImagesFromUrls(imageMap: Map<string, string>): Promis
 
         validResults.forEach(({ itemName, cachedUrl, cacheKey }) => {
           const cachedImage = newImagesByKey.get(cacheKey)!;
+          evictLruIfNeeded();
           memoryCache.set(cacheKey, cachedImage);
           results.set(itemName, cachedUrl);
         });

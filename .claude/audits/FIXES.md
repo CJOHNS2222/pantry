@@ -29,10 +29,9 @@ H1. `rebuildCommunityRatedRecipesFromRatings` — Chunked N+1 Queries
 
 Fix: batch-read with `in` queries (max 30 per query, client SDK) instead of per-doc `getDoc`.
 
-H4. imageCacheService Unbounded In-Memory Cache Growth
-`imageCacheService.ts` L21-23 — `MAX_MEMORY_CACHE_SIZE = 300` exists as a constant but is never enforced; the Map grows without bound. After browsing hundreds of items, memory pressure increases on low-end devices.
-
-Fix: implement LRU eviction when cache exceeds `MAX_MEMORY_CACHE_SIZE` — prune oldest `lastUsed` entries on insertion.
+H4. ✅ FIXED (2026-08-08) — imageCacheService Unbounded In-Memory Cache Growth
+`imageCacheService.ts` — an `evictLruIfNeeded()` helper already existed (caps at `MAX_MEMORY_CACHE_SIZE = 300`) but was only wired into 1 of 7 `memoryCache.set()` call sites (the single-item write path in `cacheImageFromUrl`). The other 6 — `loadLocalCache()` init load, both branches of `getCachedImageUrl()`, both branches of the batch `getCachedImageUrls()`, and the batch write path in `cacheImagesFromUrls()` — skipped eviction, so the cache still grew unbounded via those paths, which are actually the heavier-traffic ones (bulk pantry scans, batch Firestore reads).
+**Done:** added `evictLruIfNeeded()` before all 6 remaining `memoryCache.set()` call sites.
 
 H6. PantryScanner.tsx — Category Filter Recomputed in Render
 `PantryScanner.tsx` L511 — `Array.from(new Set(inventory.map(...).filter(Boolean)))` runs unmemoized on every render.

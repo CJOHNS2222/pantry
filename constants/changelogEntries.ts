@@ -20,6 +20,15 @@ export interface DetailedChangeEntry {
 
 export const RECENT_CHANGES: ChangeEntry[] = [
   {
+    "version": "3.0.24",
+    "date": "Aug 8, 2026",
+    "highlights": [
+      "Expanded Internationalization (i18n) — Added full translation key coverage across 7 shipped locales (de, en, es, fr,…",
+      "Online Order Disclaimer — Marked online grocery ordering section with \"Under Construction (Beta)\" status and added…",
+      "Vitest & Performance Stability — Resolved component re-render loops and timer handle leaks across testing suites."
+    ]
+  },
+  {
     "version": "3.0.23",
     "date": "Aug 7, 2026",
     "highlights": [
@@ -37,19 +46,24 @@ export const RECENT_CHANGES: ChangeEntry[] = [
       "Fixed: Manually added shopping list items disappearing — Items added via the add-item dialog were not saved and…",
       "Added: Long-press to select — Long-press any pantry item to enter bulk-select mode with that item already selected."
     ]
-  },
-  {
-    "version": "3.0.21",
-    "date": "Aug 6, 2026",
-    "highlights": [
-      "Pantry Scanner Optimization — Extracted quick-consume/swipe-gesture row handlers to a custom hook, reducing code…",
-      "Subscription Management & Purchase Security — Enhanced verification, subscription check loops, and RTDN handling for…",
-      "Shopping List Cache & Storage Optimization — Optimized offline caching and shopping list retrieval mechanics."
-    ]
   }
 ];
 
 export const ALL_CHANGES: DetailedChangeEntry[] = [
+  {
+    "version": "3.0.24",
+    "date": "Aug 8, 2026",
+    "sections": [
+      {
+        "title": "Added / Changed / Fixed",
+        "bullets": [
+          "**Expanded Internationalization (i18n)** — Added full translation key coverage across 7 shipped locales (`de`, `en`, `es`, `fr`, `ja`, `ru`, `zh`) for Pantry Modals, Shopping List, Recipes, Meal Planner, Household, Community, and Settings screens.",
+          "**Online Order Disclaimer** — Marked online grocery ordering section with \"Under Construction (Beta)\" status and added experimental feature disclaimer.",
+          "**Vitest & Performance Stability** — Resolved component re-render loops and timer handle leaks across testing suites."
+        ]
+      }
+    ]
+  },
   {
     "version": "3.0.23",
     "date": "Aug 7, 2026",

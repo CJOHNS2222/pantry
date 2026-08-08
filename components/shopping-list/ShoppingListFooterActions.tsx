@@ -38,11 +38,14 @@ export const ShoppingListFooterActions: React.FC<ShoppingListFooterActionsProps>
       <div className="flex justify-center gap-2 mt-6 flex-wrap">
         <button
           onClick={onCheckoutOnline}
-          className="flex items-center gap-2 px-4 py-2 bg-[var(--accent-color)] text-black font-bold rounded-lg hover:opacity-95 transition-opacity text-sm shadow-md"
-          title="Order ingredients online"
+          className="flex items-center gap-2 px-4 py-2 bg-[var(--accent-color)] text-black font-bold rounded-lg hover:opacity-95 transition-opacity text-sm shadow-md relative"
+          title="Order ingredients online (Under Construction)"
         >
           <ShoppingBag className="w-4 h-4 stroke-[2.5]" />
-          Order Online
+          <span>Order Online</span>
+          <span className="text-[9px] bg-amber-400 text-black font-extrabold px-1.5 py-0.5 rounded uppercase tracking-wider ml-0.5">
+            Beta
+          </span>
         </button>
         <button
           onClick={onCopyToClipboard}

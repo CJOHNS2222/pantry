@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import { Check, Search, ShoppingBag, ArrowUpRight, Link2, Save } from 'lucide-react';
+import { Check, Search, ShoppingBag, ArrowUpRight, Link2, Save, AlertTriangle, HardHat } from 'lucide-react';
 import { ShoppingItem } from '../../types';
 import { Browser } from '@capacitor/browser';
 import {
@@ -44,6 +44,7 @@ export const RetailCheckoutModal: React.FC<RetailCheckoutModalProps> = ({
       const bMatched = hasWalmartMatch(b);
       if (!aMatched && bMatched) return -1;
       if (aMatched && !bMatched) return 1;
+      if (aMatched && bMatched) return 0;
       return 0;
     });
   }, [checkoutableItems]);
@@ -99,27 +100,27 @@ export const RetailCheckoutModal: React.FC<RetailCheckoutModalProps> = ({
 
     onUpdateItem({
       ...item,
-      walmartItemId: parsedId || undefined
+      walmartItemId: parsedId || undefined,
     });
-
+    
+    // If user saved a valid ID, auto-select this item for checkout
+    if (parsedId) {
+      setSelectedItemIds(prev => ({ ...prev, [item.id]: true }));
+    }
+    
     setLinkingItemId(null);
-    setLinkInputValue('');
   };
 
   const selectAll = () => {
-    const updated: Record<string, boolean> = {};
-    checkoutableItems.forEach(item => {
-      updated[item.id] = true;
-    });
-    setSelectedItemIds(updated);
+    const next: Record<string, boolean> = {};
+    checkoutableItems.forEach(item => { next[item.id] = true; });
+    setSelectedItemIds(next);
   };
 
   const deselectAll = () => {
-    const updated: Record<string, boolean> = {};
-    checkoutableItems.forEach(item => {
-      updated[item.id] = false;
-    });
-    setSelectedItemIds(updated);
+    const next: Record<string, boolean> = {};
+    checkoutableItems.forEach(item => { next[item.id] = false; });
+    setSelectedItemIds(next);
   };
 
   const handleCheckout = async () => {
@@ -131,12 +132,12 @@ export const RetailCheckoutModal: React.FC<RetailCheckoutModalProps> = ({
       const matchedItems = activeItems.filter(item => hasWalmartMatch(item));
       const unmatchedItems = activeItems.filter(item => !hasWalmartMatch(item));
 
-      // 1. If we have matched items, add them to cart
+      // 1. If we have direct Walmart item IDs, build the direct cart URL
       if (matchedItems.length > 0) {
         const cartUrl = generateWalmartCartUrl(matchedItems);
         if (cartUrl) {
-          const trackedUrl = await wrapWithImpactTracker(cartUrl, 'walmart');
-          await Browser.open({ url: trackedUrl });
+          const trackedCartUrl = await wrapWithImpactTracker(cartUrl, 'walmart');
+          await Browser.open({ url: trackedCartUrl });
         }
       }
 
@@ -168,13 +169,31 @@ export const RetailCheckoutModal: React.FC<RetailCheckoutModalProps> = ({
       onClose={onClose}
       size="lg"
       title={
-        <span className="flex items-center gap-2.5">
-          <ShoppingBag className="w-6 h-6 text-[var(--accent-color)]" />
-          Order Ingredients Online
-        </span>
+        <div className="flex items-center justify-between w-full pr-4">
+          <span className="flex items-center gap-2.5">
+            <ShoppingBag className="w-6 h-6 text-[var(--accent-color)]" />
+            <span>Order Ingredients Online</span>
+          </span>
+          <span className="inline-flex items-center gap-1 text-[11px] bg-amber-500/15 text-amber-600 dark:text-amber-400 border border-amber-500/30 px-2.5 py-0.5 rounded-full font-bold uppercase tracking-wider">
+            <HardHat className="w-3.5 h-3.5" />
+            Under Construction
+          </span>
+        </div>
       }
     >
       <Modal.Body padding="none">
+        {/* Under Construction & Disclaimer Banner */}
+        <div className="px-4 py-3 bg-amber-500/10 border-b border-amber-500/20 text-amber-700 dark:text-amber-300 text-xs flex items-start gap-2.5">
+          <AlertTriangle className="w-4 h-4 flex-shrink-0 mt-0.5 text-amber-500" />
+          <div>
+            <div className="font-bold text-amber-800 dark:text-amber-200">
+              Feature Under Construction (Beta)
+            </div>
+            <div className="opacity-90 mt-0.5 leading-relaxed">
+              Online ordering and merchant cart matching are currently experimental and may not work 100% reliably. Product availability, prices, and links may differ on the retailer's checkout page.
+            </div>
+          </div>
+        </div>
         {/* Retailer Selector Grid */}
         <div className="p-4 border-b border-theme bg-theme-secondary/40 grid grid-cols-3 gap-2.5">
           {(
